@@ -1,0 +1,3 @@
+{ "extends": "./tsconfig.base.json",
+  "compilerOptions": { "lib": ["es2022", "dom", "dom.iterable"], "types": [] },
+  "include": ["src/client/**/*.ts", "src/shared/**/*.ts"] }
