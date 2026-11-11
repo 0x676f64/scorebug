@@ -439,7 +439,7 @@ const TEXT_ABBR_ALIASES: Record<string, string[]> = {
   RUTG: ["RU"],
   KENN: ["KSU"],
   UTAH: ["UTA"],
-  MICH: ["U-M", "UM"],
+  MICH: ["U-M", "UM", "UOM"],
   KSU: ["KSTATE"],
   MER: ["MU"],
   EMU: ["EMI"],
@@ -1177,7 +1177,8 @@ function ballShape(): string {
 
 function pinMarkup(team: NormTeam, u: number): string {
   const x = xLane(u).toFixed(1);
-  const local = `/teams/${encodeURIComponent(team.id)}.png`;
+  // scorebug: the Devvit apps bundled /teams/{id}.png; here the proxied ESPN logo is the source.
+  const local = logoSrc(team) || `/teams/${encodeURIComponent(team.id)}.png`;
   const T = FB.T;
   // The abbr is a FALLBACK for a failed logo, not a backdrop — it stays
   // hidden until the image actually errors (logos with transparency were

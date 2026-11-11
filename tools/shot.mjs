@@ -1,0 +1,11 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const [,, url, out, waitMs = '6000', bg = '#2b2f36'] = process.argv;
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+p.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('[console]', m.type(), m.text()); });
+p.on('pageerror', (e) => console.log('[pageerror]', e.message));
+await p.goto(url, { waitUntil: 'networkidle' });
+await p.addStyleTag({ content: `html,body{background:${bg} !important}` });
+await p.waitForTimeout(Number(waitMs));
+await p.screenshot({ path: out });
+await b.close();
+console.log('saved', out);

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>scorebug overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rubik:wght@400;500;600&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/overlay.css">
+</head>
+<body class="pos-bl">
+<div class="bug" id="bug" style="display:none">
+  <div class="bar" id="bar">
+    <div class="side away" id="side-away">
+      <div class="logo" id="logo-away"></div>
+      <div class="abbr" id="abbr-away"><span class="rank" id="rank-away"></span><span id="ab-away"></span></div>
+      <div class="to" id="to-away"></div>
+      <div class="poss" id="poss-away"></div>
+      <div class="score" id="score-away">0</div>
+    </div>
+    <div class="mid" id="mid">
+      <div class="status" id="status">
+        <span class="pip" id="pip"></span>
+        <span class="period" id="period"></span>
+        <span class="clock" id="clock"></span>
+      </div>
+      <div class="dd" id="dd"></div>
+      <div class="degraded" id="degraded"></div>
+    </div>
+    <div class="side home" id="side-home">
+      <div class="score" id="score-home">0</div>
+      <div class="poss" id="poss-home"></div>
+      <div class="to" id="to-home"></div>
+      <div class="abbr" id="abbr-home"><span class="rank" id="rank-home"></span><span id="ab-home"></span></div>
+      <div class="logo" id="logo-home"></div>
+    </div>
+  </div>
+  <div class="fieldwrap" id="fieldwrap">
+    <svg class="field-svg" id="field-svg" viewBox="0 -16 600 118" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="field-break" id="field-break" style="display:none"><span class="field-break-label" id="field-break-label"></span></div>
+    <div class="play-banner" id="penalty-pill"></div>
+  </div>
+  <div class="lastplay" id="last-play" style="display:none"></div>
+  <div class="pregame" id="pregame" style="display:none"></div>
+  <div class="final" id="final" style="display:none"></div>
+</div>
+<div class="setup" id="setup" style="display:none"></div>
+<script type="module" src="/overlay.js"></script>
+</body>
+</html>
