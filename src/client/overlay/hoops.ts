@@ -3,7 +3,7 @@
 
 import type { BasketballGameView, Side, TeamView } from '../../shared/basketball.ts';
 import { renderLive, resetLive, stopLive } from '../basketball/live.ts';
-import { esc, logoSrc, periodShort, setHtml } from '../basketball/ui.ts';
+import { esc, inks, logoSrc, periodShort, setHtml } from '../basketball/ui.ts';
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
@@ -19,7 +19,7 @@ function paintTeam(side: Side, t: TeamView, v: BasketballGameView): void {
   const rk = $(`rank-${name}`); const rank = t.rank ? String(t.rank) : ''; if (rk.textContent !== rank) rk.textContent = rank;
   const sc = $(`score-${name}`); const s = String(t.score);
   if (sc.textContent !== s) { sc.textContent = s; if (v.state === 'in') { sc.classList.remove('flash'); void sc.offsetWidth; sc.classList.add('flash'); } }
-  document.documentElement.style.setProperty(`--${name}`, t.color || (side === 1 ? '#8c2a2a' : '#3a5a8c'));
+  document.documentElement.style.setProperty(`--${name}`, inks(v)[side] || t.color || (side === 1 ? '#8c2a2a' : '#3a5a8c'));
   // Timeouts: the server's count from ESPN's situation feed; nothing when unknown.
   const left = t.timeoutsLeft;
   const total = v.league === 'nba' ? 7 : v.league === 'wnba' ? 4 : 4;

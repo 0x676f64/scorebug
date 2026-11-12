@@ -156,7 +156,7 @@ body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing:
   --text-secondary: rgba(226,236,248,.82); --text-muted: rgba(196,210,228,.55); --border-medium: rgba(255,255,255,.12); --radius-sm: 4px; --radius-md: 8px;
   --ease-snap: cubic-bezier(.2,.9,.3,1.05); --dur-1: .14s; }
 .hoops .court-wrap { position: relative; background: var(--glass); border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.35); }
-.hoops .view-toggle, .hoops .replay-btn { display: none; }
+.hoops .view-toggle, .hoops .replay-btn, .hoops .lead-tracker { display: none !important; }
 .hoops .bug-foot { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
 @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
 @keyframes glowPulse { 0% { transform: scale(1); opacity: 0.9; } 40% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 0.9; } }
