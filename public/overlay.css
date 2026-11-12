@@ -156,7 +156,8 @@ body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing:
   --board: rgba(210,228,255,.14); --board-edge: rgba(235,243,255,.85); --board-box: rgba(235,243,255,.85); --net: rgba(235,243,255,.85); --stanchion: #1b2c44;
   --rim: #f28b30; --shot-outline: rgba(1,9,26,.85); --bg-elev-2: rgba(255,255,255,.08); --overlay: rgba(1,9,26,.88); --on-accent: #0b1a2e; --on-warn: #0b1a2e;
   --text-secondary: rgba(226,236,248,.82); --text-muted: rgba(196,210,228,.55); --border-medium: rgba(255,255,255,.12); --radius-sm: 4px; --radius-md: 8px;
-  --ease-snap: cubic-bezier(.2,.9,.3,1.05); --dur-1: .14s; }
+  --ease-snap: cubic-bezier(.2,.9,.3,1.05); --dur-1: .14s;
+  --ball: #e8772e; --ball-seam: rgba(40, 16, 0, 0.55); --arm: #33475f; }
 .hoops .court-wrap { position: relative; background: var(--glass); border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.35); }
 .hoops .view-toggle, .hoops .replay-btn, .hoops .lead-tracker { display: none !important; }
 .hoops .bug-foot { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
@@ -166,7 +167,6 @@ body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing:
 .badge.in { background: var(--live); color: var(--on-accent); }
 .badge.ppd { background: var(--warn); color: var(--on-warn); }
 @keyframes swapIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.inj-btn .chev { width: 7px; height: 7px; border-top: 2px solid var(--on); border-right: 2px solid var(--on); transform: rotate(45deg); opacity: 0.85; flex-shrink: 0; }
 /* ── live court ──────────────────────────────────────────── */
 .court-wrap { position: relative; }
 .court { display: block; width: 100%; height: auto; }
