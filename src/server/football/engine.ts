@@ -399,29 +399,46 @@ export function buildFootballView(input: EngineInput): FootballGameView {
   // must not hold a finished game live for 15 minutes).
   for (const c of cands) { if (c.phase === 'post' || c.completed) { phase = 'post'; completed = completed || c.completed; statusName = c.statusName || statusName; statusDetail = c.statusDetail || statusDetail; break; } }
 
-  let period = primary?.period ?? prev?.period ?? 0;
-  let clock = primary?.clock ?? prev?.clock ?? '';
-  let clockSrc: Source = primary ? primary.src : 'held';
-  // Most-advanced period across status feeds (a feed can lag a period flip).
-  for (const c of cands) if (c.period > period) { period = c.period; clock = c.clock; clockSrc = c.src; }
-  // A status feed whose clock moved since prev beats one that didn't.
-  if (prev && cands.length > 1) {
-    const moved = cands.find((c) => c.period === period && c.clock && (c.clock !== prev.clock || c.period !== prev.period));
-    if (moved && moved.src !== clockSrc) { clock = moved.clock; clockSrc = moved.src; }
-  }
-  // Stuck-clock: unchanged clock for STUCK_CLOCK_MS while plays advanced → plays run it.
-  const clockChanged = !prev || clock !== prev.clock || period !== prev.period;
-  let clockAt = clockChanged ? now : prev!.stamps.clock.at;
+  // ── clock ──
+  // The STATUS clock is the most advanced reading among the live status feeds: the highest
+  // period, and within it the lowest clock (a game clock only runs down, so a feed that is
+  // behind or frozen reads high and loses). A "0:00" from a feed that does not also say the
+  // period ended is an unpopulated clock, not the end of the period, and is ignored when
+  // another feed has a real reading.
+  const topPeriod = cands.reduce((m, c) => Math.max(m, c.period), 0);
+  const pool = cands.filter((c) => c.period === topPeriod && c.clock !== '');
+  const isEnd = (c: StatusCand): boolean => /END_PERIOD|HALFTIME|FINAL/i.test(c.statusName);
+  const real = pool.filter((c) => clockSeconds(c.clock) > 0 || isEnd(c));
+  const pick = (real.length ? real : pool).reduce<StatusCand | null>((best, c) => (!best || clockSeconds(c.clock) < clockSeconds(best.clock) ? c : best), null);
+
+  const statusPeriod = pick ? pick.period : (prev?.statusPeriod ?? 0);
+  const statusClock = pick ? pick.clock : (prev?.statusClock ?? '');
+  if (pick && phase === 'in') { statusName = pick.statusName || statusName; statusDetail = pick.statusDetail || statusDetail; }
   const realPlay = newestRealPlay(drives);
-  if (phase === 'in' && !clockChanged && playsChanged && realPlay && realPlay.clock.displayValue && realPlay.period.number >= period && now - clockAt >= STUCK_CLOCK_MS) {
-    period = realPlay.period.number;
-    clock = realPlay.clock.displayValue;
-    clockSrc = 'plays';
-    clockAt = now;
+  const realPlayId = realPlay?.id ?? '';
+  // When the status clock last changed, and the newest play at that moment (carried across polls).
+  const statusMoved = !prev || statusClock !== prev.statusClock || statusPeriod !== prev.statusPeriod || !prev.statusSince;
+  const statusSince = statusMoved ? now : prev!.statusSince;
+  const playAtStatus = statusMoved ? realPlayId : prev!.playAtStatus;
+
+  let period = statusPeriod;
+  let clock = statusClock;
+  let clockSrc: Source = pick ? pick.src : 'held';
+  // STUCK CLOCK: the status clock has not moved for STUCK_CLOCK_MS while new plays arrived, and
+  // the newest play is further along than it → the plays run the clock until the status moves
+  // again. Tracked on the status reading, not the displayed one, so it holds across polls.
+  if (phase === 'in' && realPlay && realPlay.clock.displayValue && realPlayId !== playAtStatus && now - statusSince >= STUCK_CLOCK_MS) {
+    const pp = realPlay.period.number;
+    if (pp > statusPeriod || (pp === statusPeriod && clockSeconds(realPlay.clock.displayValue) < clockSeconds(statusClock))) {
+      period = pp; clock = realPlay.clock.displayValue; clockSrc = 'plays';
+    }
   }
-  // Plays can be a period ahead of a stuck status (never behind a true one).
-  if (phase === 'in' && realPlay && realPlay.period.number > period) { period = realPlay.period.number; clock = realPlay.clock.displayValue; clockSrc = 'plays'; clockAt = now; }
-  if (!primary && prev) clockSrc = 'held';
+  // Plays can be a period ahead of a lagging status (never behind a true one).
+  if (phase === 'in' && realPlay && realPlay.period.number > period && playsSrc !== 'held') { period = realPlay.period.number; clock = realPlay.clock.displayValue; clockSrc = 'plays'; }
+  // Nothing answered: hold exactly what was showing (including a play-run clock).
+  if (!pick && prev) { period = prev.period; clock = prev.clock; clockSrc = 'held'; }
+  const clockChanged = !prev || clock !== prev.clock || period !== prev.period;
+  const clockAt = clockChanged ? now : prev!.stamps.clock.at;
 
   // ── score: status candidates, newest play, prev ──
   let hs: number | null = null, as: number | null = null, scoreSrc: Source = 'held';
@@ -469,6 +486,7 @@ export function buildFootballView(input: EngineInput): FootballGameView {
     seasonType: num(summary?.header?.season?.type ?? sbEv?.season?.type, prev?.seasonType ?? 2),
     week: summary?.header?.week?.number != null ? num(summary.header.week.number) : sbEv?.week?.number != null ? num(sbEv.week.number) : (prev?.week ?? null),
     phase, statusName, statusDetail, completed, period, clock,
+    statusClock, statusPeriod, statusSince, playAtStatus,
     home, away,
     situation: heldSituation,
     drives,

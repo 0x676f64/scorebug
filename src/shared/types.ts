@@ -148,6 +148,12 @@ export interface FootballGameView {
   completed: boolean;
   period: number;
   clock: string;         // displayClock "12:34"
+  /** The status feeds' own reading (what `clock` is unless the plays took over a stuck one). */
+  statusClock: string;
+  statusPeriod: number;
+  /** When statusClock last changed, and the newest real play id at that moment (carried across polls). */
+  statusSince: number;
+  playAtStatus: string;
   home: TeamView;
   away: TeamView;
   situation: SituationView | null;

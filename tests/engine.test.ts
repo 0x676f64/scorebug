@@ -56,31 +56,65 @@ test('CFB sequence builds with ranks and situation from last play', () => {
   assert.ok(sawSituation, 'situation derived from play end spots when summary.situation is absent');
 });
 
-test('STUCK CLOCK: status clock frozen while plays advance → plays run the clock after STUCK_CLOCK_MS', () => {
+test('STUCK CLOCK: status clock frozen while plays advance → plays take the clock after STUCK_CLOCK_MS and KEEP it', () => {
   const snaps = seq('nfl-401873272').filter((s) => s.header.competitions[0].status.type.state === 'in');
   let now = 1_700_000_000_000;
-  // Build from snapshot A normally.
-  const a = snaps[20], b = snaps[30];
-  let v = buildFootballView(base('nfl', a, null, now));
+  let v = buildFootballView(base('nfl', snaps[20], null, now));
   const frozenClock = v.clock, frozenPeriod = v.period;
-  // Snapshot B has newer plays; freeze its status clock at A's.
-  const bFrozen = structuredClone(b);
-  bFrozen.header.competitions[0].status.displayClock = frozenClock;
-  bFrozen.header.competitions[0].status.period = frozenPeriod;
+  const freeze = (snap: any): any => { const c = structuredClone(snap); c.header.competitions[0].status.displayClock = frozenClock; c.header.competitions[0].status.period = frozenPeriod; return c; };
+  // New plays, frozen status, not yet long enough: status still trusted.
   now += 10_000;
-  v = buildFootballView(base('nfl', bFrozen, v, now));
-  assert.equal(v.clock, frozenClock, 'not yet stuck: status still trusted');
+  v = buildFootballView(base('nfl', freeze(snaps[22]), v, now));
+  assert.equal(v.clock, frozenClock);
   assert.equal(v.stamps.clock.src, 'summary');
-  // Same frozen status, time passes, another new play arrives.
-  const c = structuredClone(snaps[31]);
-  c.header.competitions[0].status.displayClock = frozenClock;
-  c.header.competitions[0].status.period = frozenPeriod;
+  // Past the threshold with another new play: the plays run the clock.
   now += STUCK_CLOCK_MS + 1000;
-  v = buildFootballView(base('nfl', c, v, now));
-  const lp = (c.drives.current?.plays ?? []).at(-1);
+  v = buildFootballView(base('nfl', freeze(snaps[23]), v, now));
+  const lp23 = (snaps[23].drives.current?.plays ?? []).filter((p: any) => !/timeout|two-minute|end (period|of)/i.test(p.type?.text ?? '')).at(-1);
   assert.equal(v.stamps.clock.src, 'plays');
-  assert.equal(v.clock, lp.clock.displayValue);
-  assert.equal(v.period, lp.period.number);
+  assert.equal(v.clock, lp23.clock.displayValue);
+  // The regression: the NEXT polls, status still frozen, must not flip back to the frozen value.
+  const shown: string[] = [];
+  for (const i of [23, 23, 24, 24, 25]) {
+    now += 3_000;
+    v = buildFootballView(base('nfl', freeze(snaps[i]), v, now));
+    shown.push(v.clock);
+    assert.equal(v.stamps.clock.src, 'plays', `poll on snapshot ${i} keeps the play clock`);
+    assert.notEqual(v.clock, frozenClock);
+  }
+  // The clock only ever runs down while the plays hold it.
+  const secs = shown.map((c) => { const [m, x] = c.split(':'); return Number(m) * 60 + Number(x); });
+  for (let i = 1; i < secs.length; i++) assert.ok(secs[i]! <= secs[i - 1]!, `no backwards step: ${shown.join(' → ')}`);
+  // The status comes back to life: it takes the clock again at once.
+  now += 3_000;
+  v = buildFootballView(base('nfl', snaps[26], v, now));
+  assert.equal(v.stamps.clock.src, 'summary');
+  assert.equal(v.clock, snaps[26].header.competitions[0].status.displayClock);
+});
+
+test('CLOCK CHOICE: the most advanced live reading wins; an unpopulated 0:00 does not', () => {
+  const snaps = seq('nfl-401873272').filter((s) => s.header.competitions[0].status.type.state === 'in');
+  const s = snaps[30];
+  const comp = s.header.competitions[0];
+  const [m, x] = String(comp.status.displayClock).split(':');
+  const ahead = `${m}:${String(Math.max(0, Number(x) - 7)).padStart(2, '0')}`;   // the scoreboard is 7 s further along
+  // Scoreboard event running ahead of a play-granular summary: the scoreboard's clock is shown.
+  let sb = sbEventFrom(s); sb.competitions[0].status = { ...comp.status, displayClock: ahead };
+  let v = buildFootballView(base('nfl', s, null, 1_700_000_000_000, { scoreboardEvent: sb }));
+  assert.equal(v.clock, ahead);
+  assert.equal(v.stamps.clock.src, 'scoreboard');
+  // A summary that then reports an OLDER (higher) reading does not drag the clock backwards.
+  const v2 = buildFootballView(base('nfl', s, v, 1_700_000_003_000, { scoreboardEvent: sb }));
+  assert.equal(v2.clock, ahead);
+  // A core status with an empty 0:00 mid-period is ignored…
+  const coreZero = { type: { ...comp.status.type }, displayClock: '0:00', period: comp.status.period };
+  v = buildFootballView(base('nfl', s, null, 1_700_000_000_000, { coreStatus: coreZero }));
+  assert.equal(v.clock, comp.status.displayClock);
+  // …but a 0:00 that says the period ended is the truth.
+  const coreEnd = { type: { ...comp.status.type, name: 'STATUS_END_PERIOD' }, displayClock: '0:00', period: comp.status.period };
+  v = buildFootballView(base('nfl', s, null, 1_700_000_000_000, { coreStatus: coreEnd }));
+  assert.equal(v.clock, '0:00');
+  assert.equal(v.statusName, 'STATUS_END_PERIOD');
 });
 
 test('STUCK SCORE: status score behind the newest play → play score wins; a lower play score never does', () => {

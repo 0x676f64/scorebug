@@ -20,7 +20,7 @@ const CORE: Record<FootballLeague, string> = {
 };
 
 /** Seconds a built view stays fresh, by phase. */
-const VIEW_TTL = { in: 4, pre: 60, post: 600 } as const;
+const VIEW_TTL = { in: 3, pre: 60, post: 600 } as const;
 const LOCK_MS = 5_000;
 const LOCK_WAIT_MS = 250;
 const LOCK_TRIES = 4;
