@@ -2,12 +2,15 @@
 // (fouls, bonus, timeouts, possession) and the nba-hub live court beneath it.
 
 import type { BasketballGameView, Side, TeamView } from '../../shared/basketball.ts';
-import { renderLive, resetLive, stopLive } from '../basketball/live.ts';
+import { renderLive, resetLive, setCamera, stopLive } from '../basketball/live.ts';
 import { esc, inks, logoSrc, periodShort, setHtml } from '../basketball/ui.ts';
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
 let courtFor = '';
+// Half court by default: at overlay size the attacked end is where the action is; the camera follows possession.
+const cam = new URLSearchParams(location.search).get('cam') === 'full' ? 'full' : 'half';
+setCamera(cam);
 
 function paintTeam(side: Side, t: TeamView, v: BasketballGameView): void {
   const name = side === 0 ? 'away' : 'home';

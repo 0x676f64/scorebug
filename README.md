@@ -15,7 +15,7 @@ from it. First surface: an OBS browser-source overlay.
     http://localhost:8080/health
 
 Overlay knobs: `league=cfb|nfl|nba|wnba|ncaam|ncaaw`, `team=ABBR` (ESPN's abbreviation) or `event=ID`,
-`pos=bl|br|tl|tr|bc|tc` (default `bl`), `scale=0.5..1.6`.
+`pos=bl|br|tl|tr|bc|tc` (default `bl`), `scale=0.5..1.6`; basketball: `cam=half|full` (default `half`, follows possession).
 
 In OBS: Sources → + → Browser, URL above, width 1920, height 1080, leave the custom
 CSS empty (the page is transparent). "Shutdown source when not visible" is fine.

@@ -30,6 +30,9 @@ export function toggleCamera(): void {
   animLock = null;
 }
 
+/** scorebug: the surface picks the camera from its URL (?cam=half|full). */
+export function setCamera(v: 'half' | 'full'): void { camPref = v; animLock = null; courtKey = ''; }
+
 /** Called once by the shell so a finished ball flight can re-render. */
 export function onRerender(fn: () => void): void { rerender = fn; }
 
