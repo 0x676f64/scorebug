@@ -14,7 +14,7 @@ from it. First surface: an OBS browser-source overlay.
     http://localhost:8080/overlay?league=nfl&event=401873272&pos=br&scale=0.8
     http://localhost:8080/health
 
-Overlay knobs: `league=cfb|nfl`, `team=ABBR` (ESPN's abbreviation) or `event=ID`,
+Overlay knobs: `league=cfb|nfl|nba|wnba|ncaam|ncaaw`, `team=ABBR` (ESPN's abbreviation) or `event=ID`,
 `pos=bl|br|tl|tr|bc|tc` (default `bl`), `scale=0.5..1.6`.
 
 In OBS: Sources → + → Browser, URL above, width 1920, height 1080, leave the custom
@@ -31,7 +31,7 @@ CSS empty (the page is transparent). "Shutdown source when not visible" is fine.
 
 ## Tests
 
-    npm test                   # engine against captured games + simulated failures
+    npm test                   # football + basketball engines against captured games and simulated failures
 
 ## Resilience model
 
@@ -65,3 +65,12 @@ per-feed ages, so a bad Saturday is visible at a glance.
     src/client/overlay/main.ts     the OBS overlay surface
     public/overlay.html|css        the overlay shell
     captures/                      recorded ESPN sequences for tests and replay
+
+## Basketball
+
+Same server, same overlay: `/overlay?league=nba&team=NO`, `wnba`, `ncaam`, `ncaaw`.
+`src/server/basketball/engine.ts` and `src/client/basketball/{court,court3d,live}.ts` are
+lifted verbatim from nba-hub; `espn.ts` is ported onto the shared cache with the same
+floor/held modes. Replay a captured final play by play:
+
+    /overlay?league=nba&event=401909287&start=200&speed=2
