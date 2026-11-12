@@ -34,7 +34,7 @@ function seq(league: string, id: string): any[] {
   }
   return seqs.get(k)!;
 }
-const cursors = new Map<string, { i: number; prev: FootballGameView | null; now: number }>();
+const cursors = new Map<string, { i: number; prev: FootballGameView | null; now: number; t0?: number }>();
 
 function sbEventFrom(summary: any): any {
   const comp = summary.header.competitions[0];
@@ -43,7 +43,7 @@ function sbEventFrom(summary: any): any {
   return { id: summary.header.id, date: comp.date, season: summary.header.season, week: summary.header.week, competitions: [{ ...comp, situation: lp ? { down: end.down, distance: end.distance, yardLine: end.yardLine, yardsToEndzone: end.yardsToEndzone, possession: end.team?.id, possessionText: end.possessionText, shortDownDistanceText: end.shortDownDistanceText, downDistanceText: end.downDistanceText, lastPlay: { id: lp.id, text: lp.text } } : undefined }] };
 }
 
-const hoopsCursors = new Map<string, { n: number; prev: BasketballGameView | null; now: number }>();
+const hoopsCursors = new Map<string, { n: number; prev: BasketballGameView | null; now: number; t0?: number }>();
 function hoops(url: URL, league: 'nba' | 'wnba' | 'ncaam' | 'ncaaw', send: (status: number, body: string, type?: string) => void): void {
   const id = url.searchParams.get('event') ?? '';
   const file = join(CAP, `${league}-${id}.json`);
@@ -54,7 +54,10 @@ function hoops(url: URL, league: 'nba' | 'wnba' | 'ncaam' | 'ncaaw', send: (stat
   const start = Number(url.searchParams.get('start') ?? 0) || 0;
   const key = `${league}:${id}:${fail}:${start}`;
   const total: number = (final.plays ?? []).length;
-  const c = hoopsCursors.get(key) ?? { n: start, prev: null, now: Date.now() };
+  const every = Number(url.searchParams.get('every') ?? 0);
+  const hk = key + ':' + every;
+  const c = hoopsCursors.get(hk) ?? { n: start, prev: null, now: Date.now(), t0: Date.now() } as any;
+  if (every > 0) c.n = start + Math.floor((Date.now() - c.t0) / every);
   const n = Math.min(c.n, total);
   let summary: any = summaryAt(final, n);
   const comp = summary.header.competitions[0];
@@ -68,7 +71,7 @@ function hoops(url: URL, league: 'nba' | 'wnba' | 'ncaam' | 'ncaaw', send: (stat
     const h = (s: any) => ({ src: 'held', at: s.at });
     const v: BasketballGameView = { ...c.prev, stamps: { score: h(c.prev.stamps.score), clock: h(c.prev.stamps.clock), period: h(c.prev.stamps.period), plays: h(c.prev.stamps.plays) }, mode: 'held', built: c.now };
     mark('summary', false); mark('scoreboard', false);
-    c.prev = v; c.n = Math.min(n + speed, total); hoopsCursors.set(key, c);
+    c.prev = v; c.n = Math.min(n + speed, total); hoopsCursors.set(hk, c);
     return send(200, JSON.stringify({ ...v, _replay: { n, of: total, fail } }));
   }
   mark('summary', mode === 'full'); mark('scoreboard', true); mark('coreStatus', mode === 'full'); mark('corePlays', mode === 'full');
@@ -78,7 +81,7 @@ function hoops(url: URL, league: 'nba' | 'wnba' | 'ncaam' | 'ncaaw', send: (stat
   if (mode === 'floor' && c.prev) { base.plays = c.prev.plays; base.shots = c.prev.shots; base.recent = c.prev.recent; base.last = c.prev.last; base.run = c.prev.run; base.lead = c.prev.lead; base.players = c.prev.players; base.possession = c.prev.possession; }
   const at = (changed: boolean, prevAt?: number) => (changed || !c.prev ? c.now : prevAt!);
   const view: BasketballGameView = {
-    ...base, sport: 'basketball', feeds, mode, built: c.now,
+    ...base, sport: 'basketball', feeds, mode, built: c.now, scoreDropSince: 0, scoreDropTo: '',
     stamps: {
       score: { src: mode === 'floor' ? 'scoreboard' : 'summary', at: at(!c.prev || base.teams[0].score !== c.prev.teams[0].score || base.teams[1].score !== c.prev.teams[1].score, c.prev?.stamps.score.at) },
       clock: { src: base.clockSource === 'plays' ? 'plays' : mode === 'floor' ? 'scoreboard' : 'summary', at: at(!c.prev || base.clock !== c.prev.clock, c.prev?.stamps.clock.at) },
@@ -86,7 +89,7 @@ function hoops(url: URL, league: 'nba' | 'wnba' | 'ncaam' | 'ncaaw', send: (stat
       plays: { src: mode === 'floor' ? 'held' : 'summary', at: at(!c.prev || base.lastPlayId !== c.prev.lastPlayId, c.prev?.stamps.plays.at) },
     },
   };
-  c.prev = view; c.n = Math.min(n + speed, total); hoopsCursors.set(key, c);
+  c.prev = view; c.n = Math.min(n + speed, total); hoopsCursors.set(hk, c);
   send(200, JSON.stringify({ ...view, _replay: { n, of: total, fail } }));
 }
 
@@ -95,7 +98,7 @@ const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.j
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   const send = (status: number, body: string | Buffer, type = 'application/json') => { res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' }); res.end(body); };
-  if (url.pathname === '/replay/reset') { cursors.clear(); return send(200, '{"ok":true}'); }
+  if (url.pathname === '/replay/reset') { cursors.clear(); hoopsCursors.clear(); return send(200, '{"ok":true}'); }
   if (url.pathname === '/api/game') {
     const leagueAny = url.searchParams.get('league') ?? 'nfl';
     if (/^(nba|wnba|ncaam|ncaaw)$/.test(leagueAny)) return hoops(url, leagueAny as any, send);
@@ -106,7 +109,9 @@ createServer(async (req, res) => {
     const start = Number(url.searchParams.get('start') ?? 0) || 0;
     const key = `${league}:${id}:${fail}:${start}`;
     const snaps = seq(league, id);
-    const c = cursors.get(key) ?? { i: start, prev: null, now: Date.now() };
+    const every = Number(url.searchParams.get('every') ?? 0);      // ms of real time per snapshot (a real game's cadence); 0 = one per poll
+    const c = cursors.get(key + ':' + every) ?? { i: start, prev: null, now: Date.now(), t0: Date.now() } as any;
+    if (every > 0) c.i = start + Math.floor((Date.now() - c.t0) / every);
     const i = Math.min(c.i, snaps.length - 1);
     const s = structuredClone(snaps[i]);
     const comp = s.header.competitions[0];
@@ -118,11 +123,11 @@ createServer(async (req, res) => {
     const feeds = c.prev ? structuredClone(c.prev.feeds) : emptyFeeds();
     const mark = (n: keyof typeof feeds, ok: boolean) => { const h = feeds[n]; if (ok) { h.okAt = c.now; h.fails = 0; h.reason = ''; } else { h.failAt = c.now; h.fails++; h.reason = 'HTTP 503 (replay)'; } };
     mark('summary', !!summary); mark('scoreboard', !!sbEv); mark('coreStatus', !!coreStatus);
-    // Clock: 10 s of game time per poll so the stuck-clock rule has time to trip.
-    c.now += 10_000;
+    // Clock: 10 s of game time per poll so the stuck-clock rule has time to trip (real time on a cadence).
+    c.now = every > 0 ? Date.now() : c.now + 10_000;
     const view = buildFootballView({ league, eventId: id, summary, scoreboardEvent: sbEv, coreStatus, coreSituation: null, corePlays: null, feeds, prev: c.prev, now: c.now });
     c.prev = view; c.i = Math.min(i + speed, snaps.length - 1);
-    cursors.set(key, c);
+    cursors.set(key + ':' + every, c);
     return send(200, JSON.stringify({ ...view, _replay: { i, of: snaps.length, fail } }));
   }
   let p = url.pathname === '/' ? '/overlay.html' : url.pathname;

@@ -154,6 +154,9 @@ export interface FootballGameView {
   /** When statusClock last changed, and the newest real play id at that moment (carried across polls). */
   statusSince: number;
   playAtStatus: string;
+  /** A lower score waiting to be believed: when it first appeared and what it was ("" = none). */
+  scoreDropSince: number;
+  scoreDropTo: string;
   home: TeamView;
   away: TeamView;
   situation: SituationView | null;

@@ -28,6 +28,25 @@ CSS empty (the page is transparent). "Shutdown source when not visible" is fine.
     /overlay?league=nfl&event=401873272&start=70&fail=held          everything dies
     /overlay?league=nfl&event=401873272&start=30&fail=stuckclock    status clock freezes, plays keep coming
     /overlay?league=nfl&event=401873272&start=30&fail=stuckscore    status score freezes
+    /overlay?league=nfl&event=401873272&start=105&every=7000        real-time cadence: a new play every 7 s
+
+## Viewing rules and the audit
+
+The overlay is held to seven rules (top of `src/client/overlay/main.ts`): nothing repaints
+unless it changed, nothing moves unless the game did, an animation is never cut, the result
+arrives with the ball, the clock counts down between polls without ever passing the last
+known value, one poll chain, and never a blank score.
+
+`npm run audit` measures them on the real page in Chromium against replayed games (needs
+`npm run replay` running, and `npx playwright install chromium` once):
+
+    football   boxes never move · no animation cut by a poll · result lands with the ball ·
+               an unchanged game rewrites no DOM · score never drops through a blanked feed
+    basketball boxes never move · an unchanged game rewrites no DOM · bar score lands with the shot
+    clock      never backwards · steps of a second or less · stops at the last known value
+    polling    one chain through visibility changes
+
+Run it after any change to the overlay, the field engine or the court.
 
 ## Tests
 

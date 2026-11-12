@@ -342,3 +342,73 @@ body.is-inline .shot-stats { font-size: 10px; gap: 10px; line-height: 1.2; }
 @keyframes camSwap { from { opacity: 0.25; } to { opacity: 1; } }
 @keyframes foulIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); } 60% { transform: translate(-50%, -50%) scale(1.06); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @keyframes foulOut { to { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } }
+
+/* ═════════ viewing rules (Nov 12 gameplay audit) ═════════
+   Rule 2: nothing moves unless the game did. Every slot has a fixed size, so a longer play
+   text, a new down-and-distance or a banner never shifts the bar, the field or the court. */
+
+/* One entrance, after the fonts are in. Opacity only: .pos-bc/.pos-tc own the transform. */
+.bug { opacity: 0; transition: opacity .5s var(--ease-out); }
+.bug.ready { opacity: 1; }
+/* Panes that appear (kickoff → live → final, a break label) fade in once; they never pop. */
+.pane-in { animation: paneIn .45s var(--ease-out) both; }
+@keyframes paneIn { from { opacity: 0; } to { opacity: 1; } }
+/* A logo shows when its file has loaded, in a box that was already the right size. */
+.bug-logo { opacity: 0; transition: opacity .25s var(--ease-out); }
+.bug-logo[data-ok] { opacity: 1; }
+
+/* The bar: fixed centre cell and score cells, so no text change moves a number. */
+.bar { grid-template-columns: minmax(0, 1fr) 240px minmax(0, 1fr); }
+.mid { min-width: 0; padding: 0 10px; box-sizing: border-box; overflow: hidden; }
+.score { min-width: 76px; }
+.dd { max-width: 100%; overflow: hidden; text-overflow: ellipsis; height: 16px; min-height: 16px; line-height: 16px; }
+.degraded { height: 12px; line-height: 12px; }
+/* A running clock: fixed-width period and clock, so the group does not recentre every second. */
+.live:not(.break) .period { display: inline-block; width: 34px; text-align: right; }
+.live:not(.break) .clock { display: inline-block; width: 62px; text-align: left; white-space: nowrap; }
+.break .clock, .bug:not(.live) .clock { white-space: nowrap; }
+
+/* Football last play: always the same box — title row, then two lines of text, no more. */
+.lastplay { height: 86px; max-height: none; box-sizing: border-box; padding: 10px 14px; }
+.lp-head { height: 18px; margin-bottom: 4px; align-items: center; }
+.lp-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-event { margin: 0 0 0 auto; flex: 0 0 auto; display: inline-flex; white-space: nowrap; }
+.lp-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 15px; line-height: 20px; height: 40px; }
+
+/* The field panel clips what slides across it (the scoring ribbon). */
+.fieldwrap { overflow: hidden; }
+.fieldwrap::after { display: none; }
+.field-break { z-index: 5; background: rgba(8, 12, 18, .55); border-radius: 6px; }
+.field-break-label { font-size: 30px; letter-spacing: .16em; background: none; }
+.play-banner .pb-logo, .play-banner .pb-logo-img { width: 18px; height: 18px; flex: 0 0 auto; }
+.play-banner .pb-logo img { width: 100%; height: 100%; object-fit: contain; }
+/* No logo file: the abbreviation takes the width it needs instead of an 18px box. */
+.play-banner .pb-logo:has(.logo-badge) { width: auto; }
+.play-banner .logo-badge { width: auto; height: auto; font-size: 13px; color: inherit; letter-spacing: .06em; }
+.pb-swing { margin-left: 8px; padding: 2px 7px 2px 4px; background: rgba(255, 255, 255, .16); border-radius: 999px; }
+.pb-swing-logo { width: 14px; height: 14px; object-fit: contain; }
+.pb-swing-val { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: .02em; color: inherit; }
+
+/* Scoring ribbon (cfb-scores .fv-ribbon): slides across the field as the score lands. */
+.fv-ribbon { position: absolute; left: 0; right: 0; top: 50%; z-index: 6; pointer-events: none; transform: translateY(-50%) translateX(-110%); animation: fv-ribbon 3.6s cubic-bezier(.2, .8, .2, 1) both; }
+.fv-ribbon-in { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 18px; background: var(--tc, #1d2a3a); color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .55), 0 10px 24px rgba(0, 0, 0, .35); }
+.fv-ribbon-logo { width: 40px; height: 40px; object-fit: contain; background: #fff; border-radius: 50%; padding: 3px; flex: 0 0 auto; }
+.fv-ribbon-in .logo-badge { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #14181d; display: grid; place-items: center; }
+.fv-ribbon-t { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.fv-ribbon-t b { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: .2em; white-space: nowrap; }
+.fv-ribbon-t span { font-family: var(--font-sans); font-weight: 500; font-size: 13px; opacity: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 560px; }
+@keyframes fv-ribbon { 0% { transform: translateY(-50%) translateX(-110%); } 16% { transform: translateY(-50%) translateX(0); } 82% { transform: translateY(-50%) translateX(0); } 100% { transform: translateY(-50%) translateX(110%); } }
+
+/* Basketball: the event banner under the court keeps its slot whether or not it has anything
+   to say, and is one height for a play and for a foul. */
+.hoops { display: flex; flex-direction: column; gap: 8px; }
+.hoops .banner { margin: 0; height: 56px; box-sizing: border-box; flex: 0 0 auto; }
+.hoops .banner[hidden] { display: flex !important; visibility: hidden; }
+.hoops .bn-body { justify-content: center; }
+.hoops .bn-foul { padding-top: 0; padding-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bug { transition: none; }
+  .pane-in, .fv-ribbon { animation: none !important; }
+  .fv-ribbon { transform: translateY(-50%); }
+}

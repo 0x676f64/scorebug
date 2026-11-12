@@ -17,6 +17,8 @@
 // Rules (each grounded in a live failure Joe saw):
 //   STUCK CLOCK  the status clock unchanged for STUCK_CLOCK_MS while new play ids
 //                arrive → clock/period from the newest play (basketball's rule).
+//   SCORE DROP   a lower score is held off until it has persisted SCORE_DROP_MS (feeds
+//                blank the score to 0–0 for an update; only a reversal stays down).
 //   STUCK SCORE  the newest play's homeScore/awayScore is ahead of every status
 //                score → the play's score wins. A LOWER play score never wins
 //                (plays are rewritten; a correction shows up on status first).
@@ -33,6 +35,8 @@ import type {
 type Json = any;
 
 export const STUCK_CLOCK_MS = 75_000;
+/** How long a LOWER score must persist before it is shown. */
+export const SCORE_DROP_MS = 12_000;
 
 export interface EngineInput {
   league: 'nfl' | 'cfb';
@@ -440,16 +444,34 @@ export function buildFootballView(input: EngineInput): FootballGameView {
   const clockChanged = !prev || clock !== prev.clock || period !== prev.period;
   const clockAt = clockChanged ? now : prev!.stamps.clock.at;
 
-  // ── score: status candidates, newest play, prev ──
+  // ── score ──
+  // Among the live status feeds the most advanced reading wins (the highest total: a score
+  // only goes up), then the newest REAL play if it is ahead of them all (the stuck-score case).
+  // Admin events (a timeout, a period marker) are skipped: their score fields are often 0–0.
   let hs: number | null = null, as: number | null = null, scoreSrc: Source = 'held';
-  for (const c of cands) { if (c.homeScore != null && c.awayScore != null) { hs = c.homeScore; as = c.awayScore; scoreSrc = c.src; break; } }
-  if (phase !== 'pre' && lastPlay) {
-    const ph = lastPlay.homeScore, pa = lastPlay.awayScore;
+  for (const c of cands) {
+    if (c.homeScore == null || c.awayScore == null) continue;
+    if (hs == null || as == null || c.homeScore + c.awayScore > hs + as) { hs = c.homeScore; as = c.awayScore; scoreSrc = c.src; }
+  }
+  const scorePlay = realPlay ?? lastPlay;
+  if (phase !== 'pre' && scorePlay) {
+    const ph = scorePlay.homeScore, pa = scorePlay.awayScore;
     const fromLivePlays: Source = playsSrc === 'held' ? 'held' : 'plays';
     if (hs == null || as == null) { hs = ph; as = pa; scoreSrc = fromLivePlays; }
     else if (ph + pa > hs + as && ph >= hs && pa >= as && playsSrc !== 'held') { hs = ph; as = pa; scoreSrc = 'plays'; }  // stuck score
   }
   if (hs == null || as == null) { hs = prev?.home.score ?? 0; as = prev?.away.score ?? 0; scoreSrc = 'held'; }
+  // A DROP is believed only once it has persisted. Feeds blank the score for an update (0–0 on
+  // the timeout after a touchdown, captured Aug 2026); the only real drop is an overturned
+  // scoring play, which stays down. Until SCORE_DROP_MS has passed the last score is held.
+  let scoreDropSince = 0, scoreDropTo = '';
+  if (prev && phase !== 'pre' && (hs < prev.home.score || as < prev.away.score)) {
+    const to = `${hs}-${as}`;
+    scoreDropSince = prev.scoreDropTo === to && prev.scoreDropSince ? prev.scoreDropSince : now;
+    scoreDropTo = to;
+    if (now - scoreDropSince < SCORE_DROP_MS) { hs = prev.home.score; as = prev.away.score; scoreSrc = 'held'; }
+    else { scoreDropSince = 0; scoreDropTo = ''; }
+  }
   home = { ...home, score: hs }; away = { ...away, score: as };
   const scoreChanged = !prev || hs !== prev.home.score || as !== prev.away.score;
   const scoreStamp = stamp(scoreSrc, scoreChanged ? now : prev!.stamps.score.at);
@@ -487,6 +509,7 @@ export function buildFootballView(input: EngineInput): FootballGameView {
     week: summary?.header?.week?.number != null ? num(summary.header.week.number) : sbEv?.week?.number != null ? num(sbEv.week.number) : (prev?.week ?? null),
     phase, statusName, statusDetail, completed, period, clock,
     statusClock, statusPeriod, statusSince, playAtStatus,
+    scoreDropSince, scoreDropTo,
     home, away,
     situation: heldSituation,
     drives,

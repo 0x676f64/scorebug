@@ -212,6 +212,19 @@ function playerFromText(v: GameView, text: string, side: Side): string {
   return '';
 }
 const queue: Queued[] = [];
+// scorebug: the flight in the air that has not reached the rim yet, and a hook for when one does.
+// A surface showing the score elsewhere (the overlay's bar) holds a made shot's points until the
+// ball goes in: shown = server score − pendingPoints(). It can never drift: anything dropped from
+// the queue (a burst trimmed to MAX_QUEUE, a resync, the watchdog) simply stops being pending.
+let flying: Queued | null = null;
+let shotLanded: () => void = () => {};
+export function onShotLanded(fn: () => void): void { shotLanded = fn; }
+export function pendingPoints(): [number, number] {
+  const out: [number, number] = [0, 0];
+  for (const q of queue) if (q.made && !q.blocked) out[q.side] += q.pts;
+  if (flying && flying.made && !flying.blocked) out[flying.side] += flying.pts;
+  return out;
+}
 let playing = false;
 let playingSince = 0;
 let primed = false;
@@ -276,14 +289,16 @@ export function markSeen(v: GameView): void {
   for (const x of v.shots) seen.add(x.id);
   for (const r of v.recent) seen.add(r.id);
   queue.length = 0;
+  flying = null;               // scorebug
 }
 
 function pump(v: GameView): void {
   if (playing && Date.now() - playingSince < WATCHDOG_MS) return;
   if (playing) console.warn('[anim] watchdog released a stuck flight');
   const q = queue.shift();
-  if (!q) { playing = false; if (animLock) { animLock = null; window.setTimeout(rerender, 300); } return; }
+  if (!q) { playing = false; if (flying) { flying = null; shotLanded(); } if (animLock) { animLock = null; window.setTimeout(rerender, 300); } return; }
   clearBall();                 // a stale flight settles NOW, before this one claims the queue
+  flying = q;                  // scorebug
   playing = true;
   playingSince = Date.now();
   const speed = queue.length >= 1 ? 1.35 : 1;
@@ -307,6 +322,7 @@ function fly(v: GameView, q: Queued, speed: number, done: () => void): void {
   showShooterTag(v, q);
   playShot({ from: q.from, right: q.right, made: q.made, blocked: q.blocked, seed: q.seed, style: q.style }, ink(v, q.side), {
     onImpact: (p) => {
+      if (flying === q) { flying = null; shotLanded(); }   // scorebug: the points count from here
       if (q.blocked) { chipAt(v, p, 'BLOCK', (1 - q.side) as Side, 1500); return; }
       hoopReact(q.right, q.made);
       if (q.made) floatScore(v, q);
@@ -542,6 +558,7 @@ export function renderLive(v: GameView): void {
 
 export function stopLive(): void {
   clearBall();
+  flying = null;               // scorebug
   animLock = null;
   queue.length = 0;
   playing = false;

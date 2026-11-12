@@ -615,4 +615,7 @@ export interface BasketballGameView extends GameView {
   feeds: Feeds;
   mode: 'full' | 'floor' | 'held';
   built: number;
+  /** A lower score waiting to be believed: when it first appeared and what it was ("" = none). */
+  scoreDropSince: number;
+  scoreDropTo: string;
 }

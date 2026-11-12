@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildFootballView, emptyFeeds, STUCK_CLOCK_MS, type EngineInput } from '../src/server/football/engine.ts';
+import { buildFootballView, emptyFeeds, SCORE_DROP_MS, STUCK_CLOCK_MS, type EngineInput } from '../src/server/football/engine.ts';
 import type { FootballGameView } from '../src/shared/types.ts';
 
 const CAP = join(import.meta.dirname, '..', 'captures');
@@ -26,13 +26,17 @@ test('NFL sequence: every snapshot builds, score and clock track the summary, pl
   const snaps = seq('nfl-401873272');
   let prev: FootballGameView | null = null;
   let now = 1_700_000_000_000;
-  let lastPlays = 0;
+  let lastPlays = 0, blanks = 0;
   for (const s of snaps) {
-    const v = buildFootballView(base('nfl', s, prev, now));
+    const v: FootballGameView = buildFootballView(base('nfl', s, prev, now));
     const comp = s.header.competitions[0];
     const home = comp.competitors.find((c: any) => c.homeAway === 'home'), away = comp.competitors.find((c: any) => c.homeAway === 'away');
-    assert.equal(v.home.score, Number(home.score ?? 0));
-    assert.equal(v.away.score, Number(away.score ?? 0));
+    // The summary's score, except where the feed blanks it (a drop is held off; see SCORE DROP).
+    const hs = Number(home.score ?? 0), as = Number(away.score ?? 0);
+    const dropped = !!prev && (hs < prev.home.score || as < prev.away.score);
+    if (dropped) blanks++;
+    assert.equal(v.home.score, dropped ? prev!.home.score : hs);
+    assert.equal(v.away.score, dropped ? prev!.away.score : as);
     assert.equal(v.phase, comp.status.type.state);
     assert.equal(v.mode, 'full');
     if (v.phase === 'in') { assert.ok(v.clock, 'clock present'); assert.ok(v.period > 0, 'period present'); }
@@ -41,6 +45,7 @@ test('NFL sequence: every snapshot builds, score and clock track the summary, pl
     prev = v; now += 10_000;
   }
   assert.ok(prev && prev.drives.previous.length > 5);
+  assert.ok(blanks <= 6, `the capture blanks the score ${blanks} times; each was held`);
 });
 
 test('CFB sequence builds with ranks and situation from last play', () => {
@@ -133,6 +138,33 @@ test('STUCK SCORE: status score behind the newest play → play score wins; a lo
   for (const c of s2.header.competitions[0].competitors) c.score = String(Number(c.score) + 7);
   v = buildFootballView(base('nfl', s2, null, 1_700_000_000_000));
   assert.equal(v.stamps.score.src, 'summary');
+});
+
+test('SCORE DROP: a blanked score (0–0 on the timeout after a touchdown) is not shown; a reversal that persists is', () => {
+  const all = seq('nfl-401873272');
+  // Captured: snapshot 56 is the touchdown (CIN 10), 57 the official timeout with the header at 0–0, 58 back to 10.
+  let now = 1_700_000_000_000;
+  let v = buildFootballView(base('nfl', all[55], null, now));
+  assert.equal(v.home.score, 3);
+  v = buildFootballView(base('nfl', all[56], v, now += 3000));
+  assert.equal(v.home.score, 10);
+  assert.equal(Number(all[57].header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').score), 0, 'the capture really blanks the score');
+  v = buildFootballView(base('nfl', all[57], v, now += 3000));
+  assert.equal(v.home.score, 10, 'held through the blank');
+  assert.equal(v.away.score, 0);
+  v = buildFootballView(base('nfl', all[58], v, now += 3000));
+  assert.equal(v.home.score, 10);
+  assert.equal(v.scoreDropSince, 0, 'nothing pending once the feed recovers');
+  // A real reversal: the touchdown comes off the board and stays off.
+  const reversed = structuredClone(all[58]);
+  for (const c of reversed.header.competitions[0].competitors) if (c.homeAway === 'home') c.score = '3';
+  for (const d of [...reversed.drives.previous, reversed.drives.current].filter(Boolean)) for (const p of d.plays) if (p.homeScore === 10) p.homeScore = 3;
+  v = buildFootballView(base('nfl', reversed, v, now += 3000));
+  assert.equal(v.home.score, 10, 'not believed at once');
+  v = buildFootballView(base('nfl', reversed, v, now += 3000));
+  assert.equal(v.home.score, 10);
+  v = buildFootballView(base('nfl', reversed, v, now += SCORE_DROP_MS));
+  assert.equal(v.home.score, 3, 'believed once it has persisted');
 });
 
 test('FLOOR (LSU case): summary gone, scoreboard alive → score/clock/period/situation live, drives held, mode floor', () => {

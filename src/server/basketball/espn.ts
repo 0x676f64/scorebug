@@ -25,6 +25,8 @@ const LOCK_WAIT_MS = 300;
 const LOCK_TRIES = 3;
 const FETCH_TIMEOUT_MS = 6_000;
 const SB_TTL_MS = 15_000;
+/** How long a LOWER score must persist before it is shown. */
+const SCORE_DROP_MS = 12_000;
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 async function getJson(url: string): Promise<any> {
@@ -247,7 +249,20 @@ export async function buildFromFeeds(league: League, eventId: string, prev: Bask
     base.plays = prev.plays; base.shots = prev.shots; base.recent = prev.recent; base.last = prev.last; base.run = prev.run; base.lead = prev.lead; base.players = prev.players;
     base.possession = prev.possession; base.box = prev.box; base.teamStats = prev.teamStats; base.performers = prev.performers;
   }
-  const scoreSrc: Source = mode === 'floor' ? 'scoreboard' : (fast?.plays.length ? 'plays' : 'summary');
+  // A DROP is believed only once it has persisted (football's SCORE DROP rule): a feed that
+  // blanks the score for one update must not show 0–0; a scoring change that stays is real.
+  let scoreDropSince = 0, scoreDropTo = '';
+  let scoreHeld = false;
+  if (prev && base.state === 'in' && (base.teams[0].score < prev.teams[0].score || base.teams[1].score < prev.teams[1].score)) {
+    const to = `${base.teams[0].score}-${base.teams[1].score}`;
+    scoreDropSince = prev.scoreDropTo === to && prev.scoreDropSince ? prev.scoreDropSince : now;
+    scoreDropTo = to;
+    if (now - scoreDropSince < SCORE_DROP_MS) {
+      base.teams = [{ ...base.teams[0], score: prev.teams[0].score }, { ...base.teams[1], score: prev.teams[1].score }];
+      scoreHeld = true;
+    } else { scoreDropSince = 0; scoreDropTo = ''; }
+  }
+  const scoreSrc: Source = scoreHeld ? 'held' : mode === 'floor' ? 'scoreboard' : (fast?.plays.length ? 'plays' : 'summary');
   const clockSrc: Source = base.clockSource === 'plays' ? 'plays' : mode === 'floor' ? 'scoreboard' : (fast?.status ? 'core' : 'summary');
   const playsSrc: Source = mode === 'floor' && prev && base.plays === prev.plays ? 'held' : (fast?.plays.length ? 'core' : 'summary');
   const scoreKey = `${base.teams[0].score}-${base.teams[1].score}`;
@@ -262,7 +277,7 @@ export async function buildFromFeeds(league: League, eventId: string, prev: Bask
       period: stamp(clockSrc, clockChanged ? now : prev!.stamps.period.at),
       plays: stamp(playsSrc, !prev || base.lastPlayId !== prev.lastPlayId ? now : prev!.stamps.plays.at),
     },
-    feeds, mode, built: now,
+    feeds, mode, built: now, scoreDropSince, scoreDropTo,
   };
 }
 

@@ -140,6 +140,20 @@ function scheduleScoreStage(summary: any, g: NormGame, play: any, offense: NormT
   if (onScoreLanded) onScoreLanded(scoringTeamOf(summary, g, play, offense), play, delayMs);
 }
 
+/**
+ * scorebug: the animation chain renderFieldViz last started — which play, when, and how long
+ * the ball is in motion. A surface that polls faster than a chain runs must not call
+ * renderFieldViz for the SAME play before it ends (that call writes the static end state over
+ * the running animation), and can hold the result (score, down & distance, last-play text)
+ * until the ball lands. The Devvit apps polled every 10 s, longer than any chain.
+ */
+export let lastChain: { key: string; at: number; ms: number } = { key: '', at: 0, ms: 0 };
+/** The key renderFieldViz animates on, for a summary: the newest real play (admin events excluded). */
+export function playKeyOf(summary: any): string {
+  const { last, lastReal } = lastPlays(summary);
+  return String(lastReal?.id ?? last?.id ?? '');
+}
+
 /** Drive geometry of the last render — surfaces draw the drive meter from it. */
 export let lastDriveGeom: { start: number; spot: number } | null = null;
 
@@ -1475,7 +1489,7 @@ function renderFieldViz(summary: any, g: NormGame, sit: Situation | null): void 
     } else (los as unknown as HTMLElement).style.display = "none";
   }
 
-  if (isNewPlay) lastAnimatedPlayId = playKey;
+  if (isNewPlay) { lastAnimatedPlayId = playKey; lastChain = { key: playKey, at: Date.now(), ms: chainMs }; }   // scorebug: lastChain
 }
 
 
@@ -1550,6 +1564,7 @@ function renderPlayBanner(summary: any, g: NormGame): void {
 /** Forget the current game so the next render rebuilds the statics for new teams. */
 export function resetField(): void {
   lastAnimatedPlayId = "";
+  lastChain = { key: '', at: 0, ms: 0 };
   lastDriveGeom = null;
   const svg = $("field-svg");
   if (svg) svg.innerHTML = "";
