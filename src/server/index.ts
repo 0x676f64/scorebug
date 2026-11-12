@@ -12,14 +12,16 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { cache } from './cache.ts';
+import type { Feeds, Stamp } from '../shared/types.ts';
 import { findEventForTeam, getFootballView, getSlate, type FootballLeague } from './football/espn.ts';
-import type { FootballGameView } from '../shared/types.ts';
+import { findEventForTeam as findHoopsEvent, getView as getBasketballView, type BasketballLeague } from './basketball/espn.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const PUBLIC = process.env.PUBLIC_DIR ?? join(process.cwd(), 'public');
 const BUILD = process.env.BUILD_ID ?? new Date().toISOString();
 
 const isFootball = (l: string): l is FootballLeague => l === 'nfl' || l === 'cfb';
+const isBasketball = (l: string): l is BasketballLeague => l === 'nba' || l === 'wnba' || l === 'ncaam' || l === 'ncaaw';
 
 function json(res: ServerResponse, status: number, body: unknown, cacheSeconds = 0): void {
   const text = JSON.stringify(body);
@@ -75,17 +77,17 @@ const recent = new Map<string, { league: string; eventId: string; at: number }>(
 
 async function onGame(url: URL, res: ServerResponse): Promise<void> {
   const league = String(url.searchParams.get('league') ?? '').toLowerCase();
-  if (!isFootball(league)) { json(res, 400, { error: 'league must be nfl or cfb (basketball lands next)' }); return; }
+  if (!isFootball(league) && !isBasketball(league)) { json(res, 400, { error: 'league must be nfl, cfb, nba, wnba, ncaam or ncaaw' }); return; }
   let eventId = String(url.searchParams.get('event') ?? '');
   const team = String(url.searchParams.get('team') ?? '');
   if (!eventId && team) {
-    const g = await findEventForTeam(league, team);
-    if (!g) { json(res, 404, { error: `no game on the slate for ${team}` }); return; }
-    eventId = g.eventId;
+    const id = isFootball(league) ? (await findEventForTeam(league, team))?.eventId ?? null : await findHoopsEvent(league, team);
+    if (!id) { json(res, 404, { error: `no game on the slate for ${team}` }); return; }
+    eventId = id;
   }
   if (!/^\d+$/.test(eventId)) { json(res, 400, { error: 'event (numeric) or team required' }); return; }
   try {
-    const view = await getFootballView(league, eventId);
+    const view = isFootball(league) ? await getFootballView(league, eventId) : await getBasketballView(league, eventId);
     recent.set(`${league}:${eventId}`, { league, eventId, at: Date.now() });
     json(res, 200, view);
   } catch (err) {
@@ -109,14 +111,16 @@ async function onHealth(res: ServerResponse): Promise<void> {
     if (now - r.at > 2 * 3600 * 1000) { recent.delete(k); continue; }
     const raw = await c.get(`view:${r.league}:${r.eventId}`).catch(() => null);
     if (!raw) continue;
-    const v = JSON.parse(raw) as FootballGameView;
+    const v = JSON.parse(raw) as any;
     const age = (ms: number): number | null => (ms ? Math.round((now - ms) / 1000) : null);
+    const hoops = v.sport === 'basketball';
+    const away = hoops ? v.teams[0] : v.away, home = hoops ? v.teams[1] : v.home;
     games.push({
-      game: `${r.league} ${v.away.abbr}@${v.home.abbr} ${v.eventId}`,
-      phase: v.phase, mode: v.mode, period: v.period, clock: v.clock, score: `${v.away.score}-${v.home.score}`,
+      game: `${r.league} ${away.abbr}@${home.abbr} ${v.eventId}`,
+      phase: hoops ? v.state : v.phase, mode: v.mode, period: v.period, clock: v.clock, score: `${away.score}-${home.score}`,
       builtAgoS: age(v.built),
-      stamps: Object.fromEntries(Object.entries(v.stamps).map(([f, s]) => [f, `${s.src} ${age(s.at)}s`])),
-      feeds: Object.fromEntries(Object.entries(v.feeds).map(([f, h]) => [f, { okAgoS: age(h.okAt), fails: h.fails, reason: h.reason || undefined }])),
+      stamps: Object.fromEntries(Object.entries(v.stamps as Record<string, Stamp>).map(([f, s]) => [f, `${s.src} ${age(s.at)}s`])),
+      feeds: Object.fromEntries(Object.entries(v.feeds as Feeds).map(([f, h]) => [f, { okAgoS: age(h.okAt), fails: h.fails, reason: h.reason || undefined }])),
     });
   }
   json(res, 200, { ok: true, build: BUILD, cache: { kind: c.kind, ok: await c.ping() }, uptimeS: Math.round(process.uptime()), games });

@@ -148,3 +148,182 @@ body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing:
 @keyframes fv-pop { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: translateY(0); } }
 #fv-pin.anim-in, #fv-chip.anim-in { opacity: 0; animation: fv-pop .6s var(--ease-out) both; }
 @media (prefers-reduced-motion: reduce) { #fv-pin.anim-in, #fv-chip.anim-in { animation: none; opacity: 1; } }
+
+/* ═════════ basketball court + live (lifted from nba-hub splash.css; dark floor) ═════════ */
+.hoops { --floor: #0f2238; --floor-2: #14304f; --paint: rgba(255,255,255,.045); --line: rgba(222,233,247,.34); --line-strong: rgba(235,243,255,.85);
+  --board: rgba(210,228,255,.14); --board-edge: rgba(235,243,255,.85); --board-box: rgba(235,243,255,.85); --net: rgba(235,243,255,.85); --stanchion: #1b2c44;
+  --rim: #f28b30; --shot-outline: rgba(1,9,26,.85); --bg-elev-2: rgba(255,255,255,.08); --overlay: rgba(1,9,26,.88); --on-accent: #0b1a2e; --on-warn: #0b1a2e;
+  --text-secondary: rgba(226,236,248,.82); --text-muted: rgba(196,210,228,.55); --border-medium: rgba(255,255,255,.12); --radius-sm: 4px; --radius-md: 8px;
+  --ease-snap: cubic-bezier(.2,.9,.3,1.05); --dur-1: .14s; }
+.hoops .court-wrap { position: relative; background: var(--glass); border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.35); }
+.hoops .view-toggle, .hoops .replay-btn { display: none; }
+.hoops .bug-foot { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+@keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+@keyframes glowPulse { 0% { transform: scale(1); opacity: 0.9; } 40% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 0.9; } }
+.badge { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--bg-elev-2); color: var(--text-secondary); }
+.badge.in { background: var(--live); color: var(--on-accent); }
+.badge.ppd { background: var(--warn); color: var(--on-warn); }
+@keyframes swapIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.inj-btn .chev { width: 7px; height: 7px; border-top: 2px solid var(--on); border-right: 2px solid var(--on); transform: rotate(45deg); opacity: 0.85; flex-shrink: 0; }
+/* ── live court ──────────────────────────────────────────── */
+.court-wrap { position: relative; }
+.court { display: block; width: 100%; height: auto; }
+.court.c3d { overflow: visible; }
+.court.c3d.half { overflow: hidden; }
+.court .floor { fill: var(--floor); }
+.court .floor3d { fill: url(#floorShade); }
+.court .edge { fill: none; stroke: var(--line); stroke-width: 2; }
+.court .paint { fill: var(--paint); stroke: var(--line); stroke-width: 1.6; }
+.court .ln { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.court .ln.thin { stroke-width: 1.1; }
+.court .ln.dash { stroke-dasharray: 6 6; }
+.court .board { stroke: var(--line-strong); stroke-width: 2.4; }
+.court .rim { fill: none; stroke: var(--rim); stroke-width: 2.2; }
+.court .end-tag { font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: 0.1em; text-anchor: middle; dominant-baseline: middle; }
+.court .chev { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.court .chev2 { stroke-width: 1.6; stroke-linejoin: round; }
+.court .chevs path:nth-child(1) { opacity: 0.35; }
+.court .chevs path:nth-child(2) { opacity: 0.6; }
+.court .chevs path:nth-child(3) { opacity: 0.9; }
+.court .shot.made circle:not(.and1) { stroke: var(--shot-outline); stroke-width: 1.6; }
+.court .shot.miss { fill: none; stroke-width: 2.4; stroke-linecap: round; opacity: 0.85; }
+.court .and1 { fill: none; stroke-width: 1.6; }
+.court.c3d .edge { stroke-width: 2.2; }
+.court.c3d .stanchion { fill: var(--stanchion); stroke: var(--border-medium); stroke-width: 1; }
+.court.c3d .arm { fill: none; stroke: var(--arm); stroke-width: 3; stroke-linecap: round; }
+.court.c3d .board { fill: var(--board); stroke: var(--board-edge); stroke-width: 2.2; }
+.court.c3d .board-box { fill: none; stroke: var(--board-box); stroke-width: 1.6; }
+.court.c3d .rim3d { fill: none; stroke: var(--rim); stroke-width: 2.4; }
+.court.c3d .net { fill: none; stroke: var(--net); stroke-width: 0.9; opacity: 0.75; }
+.court.c3d .end-tag3 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.1em; }
+.court.c3d .m3.made { stroke: var(--shot-outline); stroke-width: 1.2; }
+.court.c3d .m3.miss { fill: none; stroke-width: 2.4; stroke-linecap: round; opacity: 0.85; }
+.court.c3d .ball { fill: var(--ball); }
+.court.c3d .seam { stroke: var(--ball-seam); stroke-width: 1.1; fill: none; }
+.court.c3d .ball-ring { fill: none; stroke-width: 0; }
+.court.c3d.half .ln { stroke-width: 2; }
+.court.c3d.half .paint { stroke-width: 2; }
+.court.c3d.half .rim3d { stroke-width: 4; }
+.court.c3d.half .board { stroke-width: 3; }
+.court.c3d.half .board-box { stroke-width: 2.2; }
+.court.c3d.half .net { stroke-width: 1.3; }
+.court.c3d.half .end-tag3 { font-size: 26px; }
+.court.c3d.half .chev { stroke-width: 6; }
+.court.c3d.half .chev2 { stroke-width: 2.2; }
+.rim-glow { animation: rimPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes rimPulse { 0%, 100% { opacity: 0.75; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+.badge-ring { animation: ringPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.court.swap { animation: camSwap 0.4s var(--ease-out); }
+.court .fs-a { stop-color: var(--floor); }
+.court .fs-b { stop-color: var(--floor-2); }
+.view-toggle {
+  position: absolute; right: 2%; top: 3%;
+  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-medium);
+  background: var(--overlay); color: var(--text-secondary);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+.view-toggle:active { transform: scale(0.94); }
+.replay-btn {
+  position: absolute; left: 2%; top: 3%;
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; border: 1px solid var(--border-medium);
+  background: var(--overlay); color: var(--text-secondary);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-snap);
+}
+.replay-btn svg { width: 12px; height: 12px; }
+.replay-btn:active { transform: scale(0.94); }
+/* ── on-court play grammar: shooter tag, score float, chips, hoop reaction ── */
+.court.c3d .fx text { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.08em; }
+.court.c3d .fx-in { transform-box: fill-box; transform-origin: 50% 100%; animation: fxPop 0.32s var(--ease-snap) both; }
+.court.c3d .fx-chip .fx-in { animation: fxPop 0.28s var(--ease-snap) both; }
+.court.c3d .fx-float .fx-in { animation: fxFloat 1.3s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.court.c3d .fx-out { animation: fxOut 0.3s ease both; }
+.court.c3d .fx-stem { animation: fxFade 0.25s ease both; }
+@keyframes fxPop { 0% { transform: scale(0.6) translateY(6px); opacity: 0; } 60% { transform: scale(1.06) translateY(-1px); opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+@keyframes fxFloat { 0% { transform: translateY(10px) scale(0.7); opacity: 0; } 18% { transform: translateY(0) scale(1.08); opacity: 1; } 70% { transform: translateY(-34px) scale(1); opacity: 1; } 100% { transform: translateY(-52px) scale(0.96); opacity: 0; } }
+@keyframes fxOut { to { opacity: 0; } }
+@keyframes fxFade { from { opacity: 0; } to { opacity: 1; } }
+.court.c3d .net { transform-box: fill-box; transform-origin: 50% 0%; }
+.court.c3d .net.swish { animation: netSwish 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes netSwish { 0% { transform: scaleY(1); } 30% { transform: scaleY(1.28) scaleX(0.92); } 60% { transform: scaleY(0.94) scaleX(1.04); } 100% { transform: scaleY(1); } }
+.court.c3d .rim3d { transform-box: fill-box; transform-origin: 50% 50%; }
+.court.c3d .rim3d.rattle { animation: rimRattle 0.45s ease-out both; }
+@keyframes rimRattle { 0% { transform: translate(0, 0); } 20% { transform: translate(1.6px, -1.2px); } 40% { transform: translate(-1.4px, 0.8px); } 60% { transform: translate(1px, -0.5px); } 80% { transform: translate(-0.6px, 0.3px); } 100% { transform: translate(0, 0); } }
+.run {
+  position: absolute; right: 2%; bottom: 6%;
+  display: flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px;
+  background: var(--overlay); border: 1px solid var(--border-medium);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+}
+.run-sw { width: 8px; height: 8px; border-radius: 50%; }
+.run-span { color: var(--text-muted); font-weight: 600; }
+.banner {
+  position: relative; margin: 4px auto 0; display: flex; align-items: stretch; width: 100%;
+  background: var(--overlay); border: 1px solid var(--border-medium); border-radius: var(--radius-md); overflow: hidden; pointer-events: none;
+}
+.banner.pop { animation: pop 0.45s var(--ease-snap); }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+.bn-bar { width: 4px; flex-shrink: 0; }
+.bn-body { display: flex; flex-direction: column; gap: 1px; padding: 5px 10px 6px; min-width: 0; }
+.bn-top { display: flex; align-items: baseline; gap: 7px; }
+.bn-label { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
+.bn-team { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--text-secondary); }
+.bn-clock { margin-left: auto; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bn-text { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* foul: a large call with the offending team's logo */
+.banner.foul { border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+.bn-foul { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; min-width: 0; flex: 1; }
+.bn-logo { width: 34px; height: 34px; object-fit: contain; flex-shrink: 0; }
+.bn-foul-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.05; }
+.bn-foul-big { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 0.08em; color: var(--warn); }
+.bn-foul-sub { font-size: 10px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-foul .bn-clock { margin-left: auto; align-self: flex-start; }
+body.is-inline .bn-logo { width: 28px; height: 28px; }
+body.is-inline .bn-foul-big { font-size: 18px; }
+body.is-inline .bn-foul { padding: 4px 9px 4px 7px; gap: 8px; }
+/* lead tracker (`.lead-tracker`; `.lead` alone is the leading score's class on #score-0/#score-1) */
+.lead-tracker { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 6px 2px 2px; }
+.lead-tracker:empty { display: none; }
+.shot-stats { grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--text-secondary); }
+.shot-stats b { font-weight: 700; letter-spacing: 0.06em; color: var(--text-muted); font-size: 10px; margin-right: 3px; }
+.shot-stats em { font-style: normal; color: var(--text-muted); margin-left: 2px; }
+@media (min-width: 560px) {
+.bn-label { font-size: 17px; }
+.bn-text { font-size: 12px; }
+}
+/* live: the court and the last play are the inline story; the rest is in expanded + the Plays tab */
+/* court + last play + lead tracker fit the 512px view; leaders and recent plays are in expanded (and the Stats / Plays tabs). */
+body.is-inline #pane-live .recent, body.is-inline #pane-live .leaders { display: none; }
+body.is-inline #pane-live .lead-tracker { padding-top: 4px; }
+/* The svg is ABSOLUTELY positioned inside the flexible wrap, not sized with height:100%. iOS
+   Safari resolves a percentage height on a replaced element inside a flex item as "auto", so the
+   court rendered at its intrinsic 1000-unit width and ran off the post (BKN@CHA, 2026-10-06).
+   An absolutely positioned box measures the wrap's real size in every engine. */
+body.is-inline #pane-live .court-wrap { flex: 1 1 auto; min-height: 0; position: relative; width: 100%; margin: 0; }
+body.is-inline #pane-live .court { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; }
+body.is-inline #pane-live .live-side, body.is-inline #pane-live .lead-tracker { flex: 0 0 auto; }
+body.is-inline .banner { margin-top: 3px; }
+body.is-inline .bn-body { padding: 4px 9px 5px; }
+body.is-inline #pane-post .lead-tracker, body.is-inline #pane-post .facts, body.is-inline #pane-post .wrap-info,
+body.is-inline #pane-post .wrap-lead-hdr { display: none; }
+/* ── foul flash ──────────────────────────────────────────── */
+.foul-flash {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 10px; border-radius: 12px;
+  background: var(--overlay); border: 2px solid var(--team); box-shadow: 0 0 0 3px color-mix(in srgb, var(--trim) 55%, transparent), 0 12px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: none; z-index: 5;
+}
+.foul-flash.in { animation: foulIn 0.3s var(--ease-snap); }
+.foul-flash.out { animation: foulOut 0.26s var(--ease-out) forwards; }
+.ff-logo { width: 48px; height: 48px; border-radius: 50%; background: #fff; display: grid; place-items: center; padding: 4px; }
+.ff-img { width: 100%; height: 100%; object-fit: contain; }
+.ff-text { display: flex; flex-direction: column; line-height: 1; }
+.ff-text b { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: 0.08em; color: var(--team); }
+.ff-text i { font-style: normal; margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: var(--text-muted); }
+body.is-inline .ff-logo { width: 40px; height: 40px; }
+body.is-inline .ff-text b { font-size: 22px; }
+body.is-inline .shot-stats { font-size: 10px; gap: 10px; line-height: 1.2; }
+.chev { display: inline-block; width: 6px; height: 6px; border-top: 1.8px solid currentColor; border-right: 1.8px solid currentColor; transform: rotate(45deg); margin-left: 6px; }
+.view-toggle, .replay-btn, .player-pick, .inj-btn, .pg-btn { transition: transform var(--dur-1) var(--ease-snap), background var(--dur-1) ease, border-color var(--dur-1) ease, color var(--dur-1) ease; }
+.view-toggle:active, .replay-btn:active, .player-pick:active, .inj-btn:active, .pg-btn:active, .mg-card:active, .tm-game:active { transform: scale(0.95); }

@@ -10,6 +10,8 @@
 // shows as a quiet pip plus two words, never a wall.
 
 import type { FootballGameView, TeamView } from '../../shared/types.ts';
+import type { BasketballGameView } from '../../shared/basketball.ts';
+import { hoopsBreak, hoopsFinal, hoopsPregame, paintHoops } from './hoops.ts';
 import {
   buildFieldStatics, escapeHtml, fieldInputs, fitEzNames, isAdminPlay, lastPlays, logoSrc, renderFieldViz,
   renderPlayBanner, resetField, setHtml, setTimeoutsFromView, tidyPlayText, timeoutsFor,
@@ -27,7 +29,8 @@ document.body.className = `pos-${/^(bl|br|tl|tr|bc|tc)$/.test(pos) ? pos : 'bl'}
 document.documentElement.style.setProperty('--s', String(scale));
 
 // ── state ────────────────────────────────────────────────────────────────
-let view: FootballGameView | null = null;
+type AnyView = FootballGameView | BasketballGameView;
+let view: AnyView | null = null;
 let fieldBuilt = false;
 let fieldFor = '';
 let timer: number | null = null;
@@ -83,7 +86,33 @@ function paintTeam(side: 'home' | 'away', t: TeamView, v: FootballGameView): voi
   setHtml($(`to-${side}`), html);
 }
 
-function paint(v: FootballGameView): void {
+function paint(v: AnyView): void {
+  if (v.sport === 'basketball') paintBasketball(v); else paintFootball(v);
+}
+
+// Phase, uniform across sports, for the chrome the two share.
+const phaseOf = (v: AnyView): 'pre' | 'in' | 'post' => (v.sport === 'basketball' ? (v.state === 'in' ? 'in' : v.state === 'pre' ? 'pre' : 'post') : v.phase);
+
+function paintBasketball(v: BasketballGameView): void {
+  const bug = $('bug'); bug.style.display = '';
+  $('setup').style.display = 'none';
+  const brk = v.state === 'in' ? hoopsBreak(v) : '';
+  bug.classList.toggle('live', v.state === 'in');
+  bug.classList.toggle('break', !!brk);
+  bug.classList.remove('mode-full', 'mode-floor', 'mode-held');
+  bug.classList.add(`mode-${v.mode}`);
+  $('fieldwrap').style.display = 'none'; $('last-play').style.display = 'none';
+  $('pregame').style.display = v.state === 'pre' ? '' : 'none';
+  $('final').style.display = v.state === 'post' || v.state === 'postponed' ? '' : 'none';
+  const age = Math.round((Date.now() - Math.max(v.stamps.score.at, v.stamps.clock.at, v.stamps.plays.at)) / 1000);
+  $('degraded').textContent = v.mode === 'floor' ? 'scores only' : v.mode === 'held' ? `reconnecting · ${age}s` : '';
+  paintHoops(v, brk);
+  if (v.state === 'pre') setHtml($('pregame'), hoopsPregame(v));
+  if (v.state === 'post' || v.state === 'postponed') setHtml($('final'), hoopsFinal(v));
+}
+
+function paintFootball(v: FootballGameView): void {
+  $('hoops').style.display = 'none';
   const bug = $('bug'); bug.style.display = '';
   $('setup').style.display = 'none';
   const brk = v.phase === 'in' ? breakLabel(v) : '';
@@ -186,10 +215,11 @@ function kickoffLong(iso: string): string {
 }
 
 // ── polling ──────────────────────────────────────────────────────────────
-function delayFor(v: FootballGameView | null): number {
+function delayFor(v: AnyView | null): number {
   if (!v) return 5000;
-  if (v.phase === 'in') return v.mode === 'full' ? 4000 : 3000;
-  if (v.phase === 'pre') { const ms = new Date(v.date).getTime() - Date.now(); return ms < 10 * 60_000 ? 5000 : 30_000; }
+  const ph = phaseOf(v);
+  if (ph === 'in') return v.mode === 'full' ? (v.sport === 'basketball' ? 3000 : 4000) : 3000;
+  if (ph === 'pre') { const ms = (v.sport === 'basketball' ? v.tipoff : new Date(v.date).getTime()) - Date.now(); return ms < 10 * 60_000 ? 5000 : 30_000; }
   return 60_000;
 }
 
@@ -202,7 +232,7 @@ async function load(): Promise<void> {
     const res = await fetch(`/api/game?${qs}`, { cache: 'no-store' });
     if (res.status === 404) { setup(`Nothing on today's ${league.toUpperCase()} slate for <code>${escapeHtml(team)}</code>. Check the abbreviation (ESPN's, e.g. ALA, LSU, NO, KC).`); timer = window.setTimeout(load, 60_000); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const next = (await res.json()) as FootballGameView;
+    const next = (await res.json()) as AnyView;
     eventId = next.eventId;
     backoff = 0;
     view = next;
@@ -217,11 +247,11 @@ async function load(): Promise<void> {
 }
 
 // 1 Hz kickoff countdown without a server round-trip.
-window.setInterval(() => { if (view?.phase === 'pre') { const el = document.getElementById('kick-clock'); if (el) el.textContent = kickoffLong(view.date); } }, 1000);
+window.setInterval(() => { if (view?.sport === 'football' && view.phase === 'pre') { const el = document.getElementById('kick-clock'); if (el) el.textContent = kickoffLong(view.date); } }, 1000);
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void load(); });
 
-if (!/^(nfl|cfb)$/.test(league) || (!team && !eventId)) setup('Add <code>?league=cfb|nfl</code> and either <code>&amp;team=ABBR</code> or <code>&amp;event=ID</code>.');
+if (!/^(nfl|cfb|nba|wnba|ncaam|ncaaw)$/.test(league) || (!team && !eventId)) setup('Add <code>?league=cfb|nfl|nba|wnba|ncaam|ncaaw</code> and either <code>&amp;team=ABBR</code> or <code>&amp;event=ID</code>.');
 else void load();
 
 export {};
