@@ -20,6 +20,8 @@
   --away: #3a5a8c;
   --home: #8c2a2a;
 }
+/* The hidden attribute must win over any display rule (nba-hub has this globally; live.ts relies on it). */
+[hidden] { display: none !important; }
 html, body { margin: 0; background: transparent; width: 1920px; height: 1080px; overflow: hidden; }
 body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
 
@@ -327,3 +329,8 @@ body.is-inline .shot-stats { font-size: 10px; gap: 10px; line-height: 1.2; }
 .chev { display: inline-block; width: 6px; height: 6px; border-top: 1.8px solid currentColor; border-right: 1.8px solid currentColor; transform: rotate(45deg); margin-left: 6px; }
 .view-toggle, .replay-btn, .player-pick, .inj-btn, .pg-btn { transition: transform var(--dur-1) var(--ease-snap), background var(--dur-1) ease, border-color var(--dur-1) ease, color var(--dur-1) ease; }
 .view-toggle:active, .replay-btn:active, .player-pick:active, .inj-btn:active, .pg-btn:active, .mg-card:active, .tm-game:active { transform: scale(0.95); }
+/* keyframes the lifted court/live rules reference */
+@keyframes ringPulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 1; } }
+@keyframes camSwap { from { opacity: 0.25; } to { opacity: 1; } }
+@keyframes foulIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); } 60% { transform: translate(-50%, -50%) scale(1.06); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes foulOut { to { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } }
