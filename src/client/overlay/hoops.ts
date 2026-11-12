@@ -51,14 +51,50 @@ export function paintHoops(v: BasketballGameView, brk: string): void {
   const key = `${v.eventId}|${v.teams[0]!.id}|${v.teams[1]!.id}`;
   if (courtFor !== key) { resetLive(); courtFor = key; }
   try { renderLive(v); } catch (e) { console.error('renderLive', e); }
+  paintBreak(v, brk);
 }
 
+/**
+ * The break the game is in, or ''. Two independent signals, so a lagging feed can't hide it:
+ *   - ESPN's status detail ("Halftime", "End of 1st", "End 3rd")
+ *   - the play feed's own End Period marker being the newest meaningful play
+ * It ends the moment the status period moves on or a play from a later period arrives.
+ */
 export function hoopsBreak(v: BasketballGameView): string {
+  if (v.state !== 'in') return '';
   const d = v.detail.toUpperCase();
-  if (/HALF/.test(d) && !/\d:\d\d|\d\.\d/.test(d)) return 'HALFTIME';
-  if (/^END/.test(d)) return `END OF ${periodShort(v, v.period).toUpperCase()}`;
   if (/DELAY/.test(d)) return 'DELAYED';
+  const fromDetail = (/HALF/.test(d) && !/\d:\d\d|\d\.\d/.test(d)) || /^END\b/.test(d);
+  const end = v.last && v.last.kind === 'period' && !/FINAL/i.test(v.last.label) ? v.last : null;
+  const newest = v.plays?.[v.plays.length - 1];
+  const fromPlays = !!end && v.period <= end.period && (!newest || newest.period <= end.period);
+  if (!fromDetail && !fromPlays) return '';
+  const ended = fromPlays ? end!.period : v.period;      // the period that just finished
+  const half = v.regPeriods / 2;                         // 2 for quarters, 1 for halves
+  if (ended === half) return 'HALFTIME';
+  if (ended === v.regPeriods) return 'END OF REGULATION';
+  return `END OF ${periodShort(v, ended)}`;
+}
+
+/** What comes after the break, for the banner's second line. */
+function nextUp(v: BasketballGameView, brk: string): string {
+  if (brk === 'HALFTIME') return v.regPeriods === 2 ? '2nd half next' : '3rd quarter next';
+  if (brk === 'END OF REGULATION') return 'Overtime next';
+  const m = brk.match(/^END OF (Q|H)(\d)$/);
+  if (m) return `${['', '1st', '2nd', '3rd', '4th'][Number(m[2]) + 1] ?? ''} ${m[1] === 'Q' ? 'quarter' : 'half'} next`.trim();
+  if (/OT$/.test(brk)) return 'Another overtime next';
   return '';
+}
+
+let breakShown = '';
+function paintBreak(v: BasketballGameView, brk: string): void {
+  const el = $('court-break');
+  if (!brk) { if (breakShown) { el.hidden = true; breakShown = ''; } return; }
+  const [a, h] = v.teams;
+  const lead = a!.score === h!.score ? `Tied at ${a!.score}` : (a!.score > h!.score ? `${a!.abbr} by ${a!.score - h!.score}` : `${h!.abbr} by ${h!.score - a!.score}`);
+  setHtml($('court-break-label'), esc(brk));
+  setHtml($('court-break-sub'), esc([lead, nextUp(v, brk)].filter(Boolean).join('  ·  ')));
+  if (breakShown !== brk) { el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); breakShown = brk; }
 }
 
 function tip(ms: number): string {

@@ -160,6 +160,14 @@ body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing:
   --ball: #e8772e; --ball-seam: rgba(40, 16, 0, 0.55); --arm: #33475f; }
 .hoops .court-wrap { position: relative; background: var(--glass); border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.35); }
 .hoops .view-toggle, .hoops .replay-btn, .hoops .lead-tracker { display: none !important; }
+/* Break banner over the court: halftime, end of a period, end of regulation. */
+.hoops .court-break { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; background: rgba(8, 12, 18, .72); pointer-events: none; }
+.hoops .court-break.in { animation: courtBreakIn .5s var(--ease-out) both; }
+.hoops .court-break-label { font-family: var(--font-display); font-weight: 700; font-size: 44px; letter-spacing: .16em; line-height: 1; color: var(--ink); padding-left: .16em; }
+.hoops .court-break-label::after { content: ""; display: block; height: 3px; margin-top: 10px; border-radius: 2px; background: linear-gradient(90deg, var(--away) 0 50%, var(--home) 50% 100%); }
+.hoops .court-break-sub { font-family: var(--font-sans); font-weight: 500; font-size: 15px; color: var(--ink-2); white-space: pre; }
+@keyframes courtBreakIn { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hoops .court-break.in { animation: none; } }
 .hoops .bug-foot { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
 @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
 @keyframes glowPulse { 0% { transform: scale(1); opacity: 0.9; } 40% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 0.9; } }
