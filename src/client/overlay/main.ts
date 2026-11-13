@@ -28,7 +28,8 @@ import {
   type NormTeam,
 } from '../football/field.ts';
 import { clock } from './clock.ts';
-import { barLogo, setScore } from './bar.ts';
+import { barLogo, gameDate, pregameStatus, setInner, setOutcome, setRecord, setScore } from './bar.ts';
+import { finalCard, pregameCard, type CardGame, type CardTeam } from './cards.ts';
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 const q = new URLSearchParams(location.search);
@@ -116,9 +117,28 @@ function breakLabel(v: FootballGameView): string {
   return '';
 }
 
+const networkOf = (v: FootballGameView): string => v.broadcasts.find((b) => b.isNational)?.name ?? v.broadcasts[0]?.name ?? '';
+
+/** A football view as the shared pregame/final cards read it. */
+function cardGame(v: FootballGameView): CardGame {
+  const team = (t: TeamView, home: boolean): CardTeam => ({
+    abbr: t.abbr, name: t.name || t.short || t.abbr, rank: t.rank, record: t.record,
+    splits: [[home ? 'Home' : 'Away', t.split], ['Conf', t.confRecord]],
+    streak: '', last5: [], score: t.score, lines: t.linescores, leader: t.leader, color: t.color,
+  });
+  return {
+    away: team(v.away, false), home: team(v.home, true),
+    venue: v.venue?.name ?? '', city: v.venue?.city && v.venue?.state ? `${v.venue.city}, ${v.venue.state}` : (v.venue?.city ?? ''),
+    regPeriods: 4,
+  };
+}
+
 /** Identity: logo, abbreviation, rank, team colour. Never waits on anything. */
 function paintIdentity(side: 'home' | 'away', t: TeamView): void {
-  barLogo($(`logo-${side}`), logoSrc(t));
+  // The bar is dark: ESPN's dark-background variant first (Jets, Giants, Pitt vanish otherwise).
+  const std = logoSrc(t);
+  const dark = t.logoDark && /^https:\/\//i.test(t.logoDark) ? `/api/img?u=${encodeURIComponent(t.logoDark)}` : std.replace(/%2F500%2F/i, '%2F500-dark%2F');
+  barLogo($(`logo-${side}`), dark || std, std);
   const ab = $(`ab-${side}`); if (ab.textContent !== t.abbr) ab.textContent = t.abbr;
   const rk = $(`rank-${side}`); const rank = t.rank ? String(t.rank) : ''; if (rk.textContent !== rank) rk.textContent = rank;
   document.documentElement.style.setProperty(`--${side}`, t.color || (side === 'home' ? '#8c2a2a' : '#3a5a8c'));
@@ -134,14 +154,16 @@ function paintResult(v: FootballGameView, brk: string): void {
   pendingResult = null;
   window.clearTimeout(revealTimer);
   const flash = fbResultPainted && v.phase === 'in';
-  setScore($('score-away'), v.away.score, flash);
-  setScore($('score-home'), v.home.score, flash);
+  if (v.phase === 'pre') { setRecord($('score-away'), v.away.record); setRecord($('score-home'), v.home.record); }
+  else { setScore($('score-away'), v.away.score, flash); setScore($('score-home'), v.home.score, flash); }
+  setOutcome(v.away.score, v.home.score, v.phase === 'post');
   const { summary, g, sit } = fieldInputs(v);
   const live = v.phase === 'in';
   const dd = $('dd');
-  if (v.phase === 'pre') setHtml(dd, escapeHtml(v.broadcasts.find((b) => b.isNational)?.name ?? v.broadcasts[0]?.name ?? ''));
-  else if (!live || brk) setHtml(dd, '');
-  else { const st = v.situation; setHtml(dd, st?.ddText ? `<b>${escapeHtml(st.ddText)}</b>${st.possText ? ` at ${escapeHtml(st.possText)}` : ''}` : ''); }
+  if (v.phase === 'pre') setInner(dd, escapeHtml(pregameStatus(new Date(v.date).getTime(), networkOf(v), 'Kickoff').sub));
+  else if (v.phase === 'post') setInner(dd, escapeHtml(gameDate(new Date(v.date).getTime())));
+  else if (brk) setInner(dd, '');
+  else { const st = v.situation; setInner(dd, st?.ddText ? `<b>${escapeHtml(st.ddText)}</b>${st.possText ? ` at ${escapeHtml(st.possText)}` : ''}` : ''); }
   $('poss-away').classList.toggle('on', live && !brk && !!v.situation?.possIsAway);
   $('poss-home').classList.toggle('on', live && !brk && !!v.situation?.possIsHome);
   // Timeouts: three bars (one in overtime); the server's count, else the play-text counter.
@@ -150,7 +172,7 @@ function paintResult(v: FootballGameView, brk: string): void {
   const total = v.period >= 5 ? 1 : 3;
   for (const side of ['away', 'home'] as const) {
     const left = to ? to[side] : null;
-    setHtml($(`to-${side}`), live && left != null ? Array.from({ length: total }, (_, i) => `<i class="${i < left ? '' : 'used'}"></i>`).join('') : '');
+    setInner($(`to-${side}`), live && left != null ? Array.from({ length: total }, (_, i) => `<i class="${i < left ? '' : 'used'}"></i>`).join('') : '');
   }
   if (!live) return;
   fbResultPainted = true;
@@ -181,7 +203,7 @@ function paintFootball(v: FootballGameView): void {
   // status cell: period + clock (the clock runs on its own ticker)
   const per = $('period');
   const setPer = (s: string): void => { if (per.textContent !== s) per.textContent = s; };
-  if (v.phase === 'pre') { setPer(''); clock.show(kickoffShort(v.date)); }
+  if (v.phase === 'pre') { setPer(''); clock.show(pregameStatus(new Date(v.date).getTime(), networkOf(v), 'Kickoff').main); }
   else if (v.phase === 'post') { setPer(''); clock.show(v.period > 4 ? `FINAL/${periodLabel(v.period)}` : 'FINAL'); }
   else if (brk) { setPer(''); clock.show(brk); }
   else { setPer(periodLabel(v.period)); clock.run(v.clock, `${v.eventId}|${v.period}`); }
@@ -189,17 +211,8 @@ function paintFootball(v: FootballGameView): void {
   pane('fieldwrap', live); pane('last-play', live);
   pane('pregame', v.phase === 'pre'); pane('final', v.phase === 'post');
 
-  if (v.phase === 'pre') {
-    setHtml($('pregame'), `<div><div class="pg-k">KICKOFF</div><div class="pg-v" id="kick-clock">${escapeHtml(countdown(new Date(v.date).getTime()))}</div></div>` +
-      `<div class="pg-meta">${escapeHtml([v.venue?.name, v.venue?.city && v.venue?.state ? `${v.venue.city}, ${v.venue.state}` : ''].filter(Boolean).join(' · '))}</div>` +
-      `<div class="pg-meta">${escapeHtml(v.away.record ? `${v.away.abbr} ${v.away.record}` : '')}${v.home.record ? `&nbsp;&nbsp;${escapeHtml(`${v.home.abbr} ${v.home.record}`)}` : ''}</div>`);
-  }
-  if (v.phase === 'post') {
-    const w = v.home.score > v.away.score ? v.home : v.away.score > v.home.score ? v.away : null;
-    const last = v.scoringPlays[v.scoringPlays.length - 1];
-    setHtml($('final'), `<div><div class="pg-k">${w ? 'WINNER' : 'FINAL'}</div><div class="pg-v">${w ? escapeHtml(w.short || w.abbr) : 'Tie'}</div></div>` +
-      (last ? `<div class="pg-meta">${escapeHtml(tidyPlayText(last.text))}</div>` : ''));
-  }
+  if (v.phase === 'pre') setHtml($('pregame'), pregameCard(cardGame(v)));
+  if (v.phase === 'post') setHtml($('final'), finalCard(cardGame(v)));
   if (!live) { fbResultPainted = false; paintResult(v, brk); return; }
 
   // ── live: the field ──
@@ -270,7 +283,7 @@ function paintBasketball(v: BasketballGameView): void {
   pane('pregame', v.state === 'pre');
   pane('final', v.state === 'post' || v.state === 'postponed');
   paintHoops(v, brk, revealed);
-  if (v.state === 'pre') setHtml($('pregame'), hoopsPregame(v, countdown(v.tipoff)));
+  if (v.state === 'pre') setHtml($('pregame'), hoopsPregame(v));
   if (v.state === 'post' || v.state === 'postponed') setHtml($('final'), hoopsFinal(v));
 }
 
@@ -283,25 +296,14 @@ function repaint(): void { if (view) paint(view); }
 hoopsInit(repaint);
 
 // ── kickoff / tipoff ─────────────────────────────────────────────────────
-function kickoffShort(iso: string): string {
-  const d = new Date(iso); if (!Number.isFinite(d.getTime())) return '';
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-function countdown(at: number): string {
-  if (!Number.isFinite(at) || !at) return '';
-  const ms = at - Date.now();
-  if (ms > 0 && ms < 24 * 3600_000) {
-    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  }
-  return new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-}
+// The countdown in the centre cell, once a second, without a server round trip.
 window.setInterval(() => {
   const v = view; if (!v) return;
-  const at = v.sport === 'football' ? (v.phase === 'pre' ? new Date(v.date).getTime() : 0) : (v.state === 'pre' ? v.tipoff : 0);
-  if (!at) return;
-  const el = document.getElementById('kick-clock'); const s = countdown(at);
-  if (el && el.textContent !== s) el.textContent = s;
+  const pre = v.sport === 'football' ? v.phase === 'pre' : v.state === 'pre';
+  if (!pre) return;
+  const st = v.sport === 'football' ? pregameStatus(new Date(v.date).getTime(), networkOf(v), 'Kickoff') : pregameStatus(v.tipoff, v.broadcast, 'Tipoff');
+  clock.show(st.main);
+  setInner($('dd'), escapeHtml(st.sub));
 }, 1000);
 
 // ── polling: one chain, ever ─────────────────────────────────────────────

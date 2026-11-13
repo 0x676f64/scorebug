@@ -412,3 +412,55 @@ body.is-inline .shot-stats { font-size: 10px; gap: 10px; line-height: 1.2; }
   .pane-in, .fv-ribbon { animation: none !important; }
   .fv-ribbon { transform: translateY(-50%); }
 }
+
+/* ═════════ pregame and final (Nov 13) ═════════ */
+
+/* Bar, pregame: the record sits where the score will be. Set like a record, not a score. */
+.score.rec { font-size: 27px; font-weight: 600; letter-spacing: .01em; color: var(--ink-2); }
+
+/* Bar, final: an arrow beside the winning score, pointing at it; the loser recedes. */
+.score { position: relative; }
+.score::after { content: ""; position: absolute; top: 50%; left: 100%; margin: -7px 0 0 3px; border-style: solid; border-width: 7px 9px 7px 0; border-color: transparent var(--ink) transparent transparent; opacity: 0; transform: translateX(6px); transition: opacity .35s var(--ease-out), transform .35s var(--ease-out); pointer-events: none; }
+.side.home .score::after { left: auto; right: 100%; margin: -7px 3px 0 0; border-width: 7px 0 7px 9px; border-color: transparent transparent transparent var(--ink); transform: translateX(-6px); }
+.side.won .score::after { opacity: 1; transform: none; }
+.side .score, .side .abbr, .side .logo { transition: opacity .35s var(--ease-out), color .35s var(--ease-out); }
+.side.lost .score, .side.lost .abbr { color: var(--ink-3); }
+.side.lost .logo { opacity: .55; }
+.side.lost::before { opacity: .45; }
+
+/* Cards share one panel. */
+.pregame, .final { padding: 13px 18px; gap: 20px; }
+
+/* Pregame: full names with labelled splits either side of the venue. */
+.pregame { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
+.mc-team { min-width: 0; padding-left: 12px; border-left: 3px solid var(--tc); }
+.mc-team.home { padding: 0 12px 0 0; border-left: 0; border-right: 3px solid var(--tc); text-align: right; }
+.mc-name { font-family: var(--font-display); font-weight: 600; font-size: 21px; line-height: 1.15; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-facts { display: flex; align-items: center; gap: 14px; margin-top: 5px; min-height: 18px; white-space: nowrap; }
+.mc-team.home .mc-facts { justify-content: flex-end; }
+.mc-split { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mc-split i { font-style: normal; font-weight: 400; font-size: 13px; color: var(--ink-3); margin-right: 6px; }
+.mc-form { display: inline-flex; gap: 3px; }
+.mc-form b { width: 17px; height: 17px; border-radius: 3px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: 10px; line-height: 1; }
+.mc-form b.w { background: #2aa866; color: #fff; }
+.mc-form b.l { background: rgba(255, 255, 255, .13); color: var(--ink-2); }
+.mc-where { text-align: center; max-width: 230px; }
+.mc-venue { font-size: 14px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-city { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+
+/* Final: line score, then each team's headline line. */
+.final { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+.ls { border-collapse: collapse; font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.ls th, .ls td { padding: 2px 9px; text-align: center; line-height: 1.35; }
+.ls thead th { font-size: 11px; font-weight: 500; color: var(--ink-3); padding-bottom: 3px; }
+.ls tbody th { text-align: left; padding-left: 0; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.ls td { font-size: 15px; font-weight: 500; color: var(--ink-2); min-width: 16px; }
+.ls .ls-total { font-size: 19px; font-weight: 700; color: var(--ink); padding-right: 0; padding-left: 14px; }
+.ls tr.lost th, .ls tr.lost .ls-total { color: var(--ink-2); }
+.ls tr.lost td { color: var(--ink-3); }
+.ls-chip { display: inline-block; width: 4px; height: 14px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+.lds { display: grid; gap: 7px; min-width: 0; padding-left: 20px; border-left: 1px solid var(--line); }
+.ld { display: flex; align-items: baseline; gap: 10px; min-width: 0; white-space: nowrap; }
+.ld-team { flex: 0 0 auto; min-width: 36px; font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: .04em; color: var(--ink-3); }
+.ld-name { flex: 0 0 auto; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ld-line { min-width: 0; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }

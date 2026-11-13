@@ -52,6 +52,12 @@ export interface TeamView {
   abbr: string;      // "ALA"
   score: number;
   record: string;
+  /** Venue-relevant split: the home team's home record, the away team's road record. "" if unknown. */
+  split: string;
+  /** College: the conference record (ESPN's vsconf); "" elsewhere. */
+  confRecord: string;
+  /** The team's headline stat line once there is one (passing leader, else rushing). */
+  leader: { name: string; line: string } | null;
   rank: number | null;   // AP rank (college), null otherwise
   logo: string;          // ESPN logo href (proxied by the client)
   logoDark: string;

@@ -82,6 +82,26 @@ function recordOf(c: Json): string {
   return rec ? str(rec) : '';
 }
 
+/** One typed record ("home", "road", "vsconf") from a competitor's record list. */
+function recordType(c: Json, type: string): string {
+  const rec = Array.isArray(c?.record) ? c.record : Array.isArray(c?.records) ? c.records : [];
+  return str(rec.find((r: Json) => r?.type === type)?.summary);
+}
+
+/** summary.leaders → each team's headline line: the passing leader, else the first category that has one. */
+function leadersOf(summary: Json): Map<string, { name: string; line: string }> {
+  const out = new Map<string, { name: string; line: string }>();
+  for (const t of arr(summary?.leaders)) {
+    const cats = arr(t?.leaders).filter((c: Json) => arr(c?.leaders).length);
+    const cat = cats.find((c: Json) => c?.name === 'passingYards') ?? cats[0];
+    const top = cat?.leaders?.[0];
+    const name = str(top?.athlete?.shortName ?? top?.athlete?.displayName);
+    const line = str(top?.displayValue);
+    if (name && line) out.set(idOf(t?.team), { name, line });
+  }
+  return out;
+}
+
 function teamOf(c: Json, prev: TeamView | null): TeamView {
   const t = c?.team ?? {};
   const logos = arr(t.logos);
@@ -96,6 +116,9 @@ function teamOf(c: Json, prev: TeamView | null): TeamView {
     abbr: str(t.abbreviation) || prev?.abbr || '',
     score: c?.score != null ? num(c.score) : (prev?.score ?? 0),
     record: recordOf(c) || prev?.record || '',
+    split: recordType(c, c?.homeAway === 'home' ? 'home' : 'road') || prev?.split || '',
+    confRecord: recordType(c, 'vsconf') || prev?.confRecord || '',
+    leader: prev?.leader ?? null,
     rank: rawRank >= 1 && rawRank <= 25 ? rawRank : (prev?.rank ?? null),
     logo: str(logos[0]?.href) || str(t.logo) || prev?.logo || '',
     logoDark: str(dark?.href) || prev?.logoDark || '',
@@ -472,7 +495,9 @@ export function buildFootballView(input: EngineInput): FootballGameView {
     if (now - scoreDropSince < SCORE_DROP_MS) { hs = prev.home.score; as = prev.away.score; scoreSrc = 'held'; }
     else { scoreDropSince = 0; scoreDropTo = ''; }
   }
-  home = { ...home, score: hs }; away = { ...away, score: as };
+  const lead = summary?.leaders ? leadersOf(summary) : null;
+  home = { ...home, score: hs, leader: lead?.get(home.id) ?? home.leader };
+  away = { ...away, score: as, leader: lead?.get(away.id) ?? away.leader };
   const scoreChanged = !prev || hs !== prev.home.score || as !== prev.away.score;
   const scoreStamp = stamp(scoreSrc, scoreChanged ? now : prev!.stamps.score.at);
 

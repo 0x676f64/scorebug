@@ -4,7 +4,8 @@
 import type { BasketballGameView, Side, TeamView } from '../../shared/basketball.ts';
 import { markSeen, onRerender, onShotLanded, pendingPoints, renderLive, resetLive, setCamera, stopLive } from '../basketball/live.ts';
 import { esc, inks, logoSrc, periodShort, setHtml } from '../basketball/ui.ts';
-import { barLogo, setScore } from './bar.ts';
+import { barLogo, gameDate, pregameStatus, setInner, setOutcome, setRecord, setScore } from './bar.ts';
+import { finalCard, pregameCard, type CardGame, type CardTeam } from './cards.ts';
 import { clock } from './clock.ts';
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
@@ -29,7 +30,7 @@ function paintTeam(side: Side, t: TeamView, v: BasketballGameView): void {
   // Timeouts: the server's count from ESPN's situation feed; nothing when unknown.
   const left = t.timeoutsLeft;
   const total = v.league === 'nba' ? 7 : 4;
-  setHtml($(`to-${name}`), v.state === 'in' && left != null ? Array.from({ length: total }, (_, i) => `<i class="${i < left ? '' : 'used'}"></i>`).join('') : '');
+  setInner($(`to-${name}`), v.state === 'in' && left != null ? Array.from({ length: total }, (_, i) => `<i class="${i < left ? '' : 'used'}"></i>`).join('') : '');
   $(`poss-${name}`).classList.toggle('on', v.state === 'in' && v.possession === side);
 }
 
@@ -39,6 +40,8 @@ function paintTeam(side: Side, t: TeamView, v: BasketballGameView): void {
 // own score did (a correction).
 let shownScore: [number | null, number | null] = [null, null];
 function paintScores(v: BasketballGameView, live: boolean, flashOk: boolean): void {
+  setOutcome(v.teams[0]!.score, v.teams[1]!.score, v.state === 'post');
+  if (v.state === 'pre') { setRecord($('score-away'), v.teams[0]!.record); setRecord($('score-home'), v.teams[1]!.record); shownScore = [null, null]; return; }
   const pend = live ? pendingPoints() : [0, 0];
   for (const side of [0, 1] as const) {
     const truth = v.teams[side]!.score;
@@ -54,15 +57,15 @@ export function paintHoops(v: BasketballGameView, brk: string, revealed: boolean
   paintTeam(0, v.teams[0]!, v); paintTeam(1, v.teams[1]!, v);
   const per = $('period'), dd = $('dd');
   const setPer = (s: string): void => { if (per.textContent !== s) per.textContent = s; };
-  if (v.state === 'pre') { setPer(''); clock.show(tip(v.tipoff)); setHtml(dd, esc(v.broadcast)); }
-  else if (!live) { setPer(''); clock.show(v.state === 'postponed' ? 'POSTPONED' : (v.period > v.regPeriods ? `FINAL/${periodShort(v, v.period)}` : 'FINAL')); setHtml(dd, ''); }
-  else if (brk) { setPer(''); clock.show(brk); setHtml(dd, ''); }
+  if (v.state === 'pre') { const st = pregameStatus(v.tipoff, v.broadcast, 'Tipoff'); setPer(''); clock.show(st.main); setInner(dd, esc(st.sub)); }
+  else if (!live) { setPer(''); clock.show(v.state === 'postponed' ? 'POSTPONED' : (v.period > v.regPeriods ? `FINAL/${periodShort(v, v.period)}` : 'FINAL')); setInner(dd, esc(gameDate(v.tipoff))); }
+  else if (brk) { setPer(''); clock.show(brk); setInner(dd, ''); }
   else {
     setPer(periodShort(v, v.period));
     clock.run(v.clock, `${v.eventId}|${v.period}`);
     // Fouls and bonus for both sides, compact: "UVU 5  UTU 7 BONUS"
     const f = (s: Side): string => { const t = v.teams[s]!; return `<b>${esc(t.abbr)}</b> ${t.fouls}${t.bonus === 'double' ? ' <b>2×</b>' : t.bonus === 'bonus' ? ' <b>BONUS</b>' : ''}`; };
-    setHtml(dd, `${f(0)} &nbsp; ${f(1)}`);
+    setInner(dd, `${f(0)} &nbsp; ${f(1)}`);
   }
 
   const hoops = $('hoops');
@@ -124,23 +127,20 @@ function paintBreak(v: BasketballGameView, brk: string): void {
   if (breakShown !== brk) { el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); breakShown = brk; }
 }
 
-function tip(ms: number): string {
-  if (!ms) return '';
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** A basketball view as the shared pregame/final cards read it. */
+function cardGame(v: BasketballGameView): CardGame {
+  const team = (t: TeamView, side: Side): CardTeam => {
+    const top = v.performers.find((p) => p.side === side);
+    return {
+      abbr: t.abbr, name: t.name || t.short || t.abbr, rank: t.rank, record: t.record,
+      splits: [[side === 1 ? 'Home' : 'Away', t.split.replace(/^(home|away|road)\s+/i, '')], ['Conf', t.confRecord]],
+      streak: t.streak, last5: t.last5.map((g) => g.won),
+      score: t.score, lines: t.linescores, leader: top ? { name: top.name, line: top.line } : null,
+      color: inks(v)[side] || t.color,
+    };
+  };
+  return { away: team(v.teams[0]!, 0), home: team(v.teams[1]!, 1), venue: v.venue, city: v.city, regPeriods: v.regPeriods };
 }
 
-/** Pregame card content. */
-export function hoopsPregame(v: BasketballGameView, countdown: string): string {
-  const rec = (t: TeamView): string => (t.record ? `${t.abbr} ${t.record}` : '');
-  return `<div><div class="pg-k">TIPOFF</div><div class="pg-v" id="kick-clock">${esc(countdown)}</div></div>` +
-    `<div class="pg-meta">${esc([v.venue, v.city].filter(Boolean).join(' · '))}</div>` +
-    `<div class="pg-meta">${esc(rec(v.teams[0]!))}${rec(v.teams[1]!) ? `&nbsp;&nbsp;${esc(rec(v.teams[1]!))}` : ''}</div>`;
-}
-
-export function hoopsFinal(v: BasketballGameView): string {
-  const [a, h] = v.teams;
-  const w = h!.score > a!.score ? h! : a!.score > h!.score ? a! : null;
-  const top = v.performers[0];
-  return `<div><div class="pg-k">${w ? 'WINNER' : 'FINAL'}</div><div class="pg-v">${w ? esc(w.name) : 'Tie'}</div></div>` +
-    (top ? `<div class="pg-meta">${esc(top.name)} · ${esc(top.line)}</div>` : '');
-}
+export const hoopsPregame = (v: BasketballGameView): string => pregameCard(cardGame(v));
+export const hoopsFinal = (v: BasketballGameView): string => finalCard(cardGame(v));
